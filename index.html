@@ -2,106 +2,112 @@
 <html lang="my">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RLay AI Chatbot</title>
-    <!-- Marked.js for Code & Markdown Formatting -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RLay AI Assistant</title>
+    <!-- Marked.js for Code Rendering -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
     <style>
-        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { margin: 0; background-color: #131314; color: #e3e3e3; display: flex; height: 100vh; height: 100dvh; overflow: hidden; }
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        body { margin: 0; background-color: #131314; color: #e3e3e3; height: 100vh; height: 100dvh; overflow: hidden; }
 
-        /* Login Container */
-        #auth-container {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: #131314; z-index: 100; display: flex;
-            justify-content: center; align-items: center; flex-direction: column; gap: 15px;
-        }
+        /* General Page View Setup */
+        .page { display: none; width: 100%; height: 100%; flex-direction: column; }
+        .page.active { display: flex; }
+
+        /* ---------------- PAGE 1: AUTH PAGE ---------------- */
+        #auth-page { justify-content: center; align-items: center; padding: 20px; }
         .login-card {
-            background: #1e1f20; padding: 30px; border-radius: 16px; border: 1px solid #333;
-            text-align: center; max-width: 350px; width: 90%;
+            background: #1e1f20; padding: 30px 25px; border-radius: 20px;
+            border: 1px solid #333; text-align: center; max-width: 380px; width: 100%;
         }
-        .login-card h2 { color: #a8c7fa; margin-bottom: 20px; }
+        .login-card h2 { color: #a8c7fa; margin-bottom: 24px; font-size: 22px; }
         .login-card input {
-            width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px;
-            border: 1px solid #444; background: #2a2a2a; color: white; outline: none;
+            width: 100%; padding: 14px; margin-bottom: 12px; border-radius: 10px;
+            border: 1px solid #444; background: #2a2a2a; color: white; outline: none; font-size: 15px;
         }
         .auth-btn {
-            width: 100%; padding: 12px; background: #a8c7fa; color: #040c1e;
-            border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px;
+            width: 100%; padding: 14px; background: #a8c7fa; color: #040c1e;
+            border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 15px; margin-top: 5px;
         }
 
-        /* Sidebar for Chat History */
-        .sidebar {
-            width: 260px; background-color: #1e1f20; border-right: 1px solid #2e2f31;
-            display: flex; flex-direction: column; padding: 15px;
+        /* ---------------- PAGE 2: DASHBOARD / HISTORY PAGE ---------------- */
+        .dash-header {
+            padding: 18px 20px; background: #1e1f20; border-bottom: 1px solid #2e2f31;
+            display: flex; justify-content: space-between; align-items: center;
         }
-        .new-chat-btn {
-            background: #a8c7fa; color: #040c1e; border: none; padding: 12px;
-            border-radius: 20px; font-weight: bold; cursor: pointer; margin-bottom: 15px;
+        .dash-header .user-info { font-size: 13px; color: #a8c7fa; font-weight: 500; }
+        .logout-btn { color: #ff6b6b; background: rgba(255,107,107,0.1); border: 1px solid #ff6b6b; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; }
+        
+        .dash-content { flex: 1; padding: 20px; overflow-y: auto; max-width: 600px; margin: 0 auto; width: 100%; }
+        .new-chat-card {
+            background: #a8c7fa; color: #040c1e; padding: 16px; border-radius: 14px;
+            font-weight: bold; text-align: center; cursor: pointer; font-size: 16px; margin-bottom: 25px;
+            box-shadow: 0 4px 12px rgba(168, 199, 250, 0.2);
         }
-        .history-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .section-title { font-size: 14px; color: #8e918f; margin-bottom: 12px; font-weight: 600; }
+        .history-list { display: flex; flex-direction: column; gap: 10px; }
         .history-item {
-            padding: 10px 12px; border-radius: 8px; background: #2a2a2a;
-            cursor: pointer; font-size: 13px; display: flex; justify-content: space-between; align-items: center;
+            padding: 14px 16px; border-radius: 12px; background: #1e1f20; border: 1px solid #2e2f31;
+            cursor: pointer; font-size: 14px; display: flex; justify-content: space-between; align-items: center;
         }
-        .history-item.active { background: #007bff; color: white; }
-        .user-profile { padding-top: 10px; border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
-        .logout-btn { color: #ff4d4d; background: none; border: none; cursor: pointer; font-size: 12px; }
+        .history-item:active { background: #2a2a2a; }
 
-        /* Main Chat Area */
-        .main-chat { flex: 1; display: flex; flex-direction: column; height: 100%; }
-        .header { padding: 15px; background: #1e1f20; border-bottom: 1px solid #2e2f31; text-align: center; }
-        .header h3 { margin: 0; color: #a8c7fa; font-size: 16px; }
+        /* ---------------- PAGE 3: CHAT PAGE ---------------- */
+        .chat-header {
+            padding: 12px 16px; background: #1e1f20; border-bottom: 1px solid #2e2f31;
+            display: flex; align-items: center; gap: 15px;
+        }
+        .back-btn { background: #2a2a2a; color: #a8c7fa; border: 1px solid #333; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+        .chat-title { font-size: 15px; color: #e3e3e3; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-        #chat-box { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
-        .message { max-width: 80%; padding: 12px 16px; border-radius: 16px; font-size: 14px; line-height: 1.5; word-wrap: break-word; }
-        .user { background: #282a2c; color: #e3e3e3; align-self: flex-end; border-bottom-right-radius: 2px; }
-        .bot { background: #1e1f20; color: #c4c7c5; align-self: flex-start; border-bottom-left-radius: 2px; border: 1px solid #2e2f31; }
+        #chat-box { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+        .message { max-width: 88%; padding: 12px 16px; border-radius: 16px; font-size: 15px; line-height: 1.5; word-wrap: break-word; }
+        .user { background: #282a2c; color: #e3e3e3; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .bot { background: #1e1f20; color: #c4c7c5; align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid #2e2f31; }
 
-        /* Code Styling */
-        pre { background: #0d0e0f; padding: 12px; border-radius: 8px; overflow-x: auto; border: 1px solid #333; }
+        /* Code Block Styling */
+        pre { background: #0d0e0f; padding: 12px; border-radius: 8px; overflow-x: auto; border: 1px solid #333; margin: 8px 0; }
         code { font-family: monospace; color: #75beff; }
 
-        /* Input Area */
-        .input-area-wrapper { padding: 15px; background: #131314; }
-        .input-area { max-width: 800px; margin: 0 auto; display: flex; background: #1e1f20; border-radius: 28px; padding: 6px 12px; border: 1px solid #333; }
-        input[type="text"] { flex: 1; background: transparent; border: none; color: #fff; padding: 10px 15px; font-size: 15px; outline: none; }
+        /* Chat Input Section */
+        .input-area-wrapper { padding: 12px 16px; background: #131314; border-top: 1px solid #2e2f31; }
+        .input-area { max-width: 800px; margin: 0 auto; display: flex; background: #1e1f20; border-radius: 28px; padding: 4px 8px 4px 16px; border: 1px solid #333; }
+        input[type="text"] { flex: 1; background: transparent; border: none; color: #fff; font-size: 15px; outline: none; }
         button.send-btn { background: #a8c7fa; color: #040c1e; border: none; border-radius: 20px; padding: 8px 18px; font-weight: bold; cursor: pointer; }
-
-        @media (max-width: 768px) {
-            body { flex-direction: column; }
-            .sidebar { width: 100%; height: 150px; }
-        }
     </style>
 </head>
 <body>
 
-    <!-- Login Screen -->
-    <div id="auth-container">
+    <!-- 1. LOGIN / REGISTER PAGE -->
+    <div id="auth-page" class="page active">
         <div class="login-card">
-            <h2>RLay AI Login</h2>
-            <input type="email" id="authEmail" placeholder="Email">
-            <input type="password" id="authPassword" placeholder="Password">
+            <h2>✨ RLay AI Login</h2>
+            <input type="email" id="authEmail" placeholder="အီးမေးလ် (Email)">
+            <input type="password" id="authPassword" placeholder="လျှို့ဝှက်နံပါတ် (Password)">
             <button class="auth-btn" onclick="handleLogin()">အကောင့်ဝင်မည်</button>
             <button class="auth-btn" style="background: #2a2a2a; color: #a8c7fa;" onclick="handleRegister()">အကောင့်သစ်ဖွင့်မည်</button>
         </div>
     </div>
 
-    <!-- Sidebar -->
-    <div class="sidebar">
-        <button class="new-chat-btn" onclick="createNewChat()">+ စကားဝိုင်းအသစ်</button>
-        <div class="history-list" id="historyList"></div>
-        <div class="user-profile">
-            <span id="userDisplay" style="font-size: 12px; color: #aaa;"></span>
+    <!-- 2. DASHBOARD / HISTORY PAGE -->
+    <div id="dash-page" class="page">
+        <div class="dash-header">
+            <div class="user-info" id="userDisplay">user@gmail.com</div>
             <button class="logout-btn" onclick="handleLogout()">ထွက်မည်</button>
+        </div>
+        <div class="dash-content">
+            <div class="new-chat-card" onclick="createNewChat()">+ စကားဝိုင်းအသစ် စတင်မည်</div>
+            <div class="section-title">ယခင် စကားဝိုင်းများ</div>
+            <div class="history-list" id="historyList"></div>
         </div>
     </div>
 
-    <!-- Main Chat Window -->
-    <div class="main-chat">
-        <div class="header">
-            <h3>✨ RLay AI Assistant</h3>
+    <!-- 3. CHAT PAGE -->
+    <div id="chat-page" class="page">
+        <div class="chat-header">
+            <button class="back-btn" onclick="showPage('dash-page')">← နောက်သို့</button>
+            <div class="chat-title" id="activeChatTitle">စကားဝိုင်း</div>
         </div>
 
         <div id="chat-box"></div>
@@ -114,7 +120,7 @@
         </div>
     </div>
 
-    <!-- Firebase SDK Modular Import -->
+    <!-- Firebase SDK Imports -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { 
@@ -122,10 +128,10 @@
             onAuthStateChanged, signOut 
         } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { 
-            getFirestore, collection, addDoc, doc, setDoc, getDocs, query, where, orderBy, onSnapshot 
+            getFirestore, collection, addDoc, doc, setDoc, query, where, onSnapshot 
         } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // ပေးပို့ထားသော Firebase Credentials
+        // Firebase Configuration Credentials
         const firebaseConfig = {
             apiKey: "AIzaSyDOkVig413DDIo1ouusq2qhTIeb3jUMU24",
             authDomain: "rlay-ai-chat.firebaseapp.com",
@@ -148,26 +154,32 @@
         let currentSessionId = null;
         let activeMessages = [];
 
-        // Auth Monitor
+        // Page Switcher Function
+        window.showPage = (pageId) => {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+        };
+
+        // Firebase Auth Monitor
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
-                document.getElementById("auth-container").style.display = "none";
                 document.getElementById("userDisplay").innerText = user.email;
+                showPage("dash-page");
                 loadUserHistory();
             } else {
                 currentUser = null;
-                document.getElementById("auth-container").style.display = "flex";
+                showPage("auth-page");
             }
         });
 
-        // Auth Actions
+        // Authentication Actions
         window.handleRegister = async () => {
             const email = document.getElementById("authEmail").value;
             const pass = document.getElementById("authPassword").value;
             try {
                 await createUserWithEmailAndPassword(auth, email, pass);
-            } catch (e) { alert(e.message); }
+            } catch (e) { alert("အကောင့်ဖွင့်ခြင်း မအောင်မြင်ပါ: " + e.message); }
         };
 
         window.handleLogin = async () => {
@@ -175,13 +187,13 @@
             const pass = document.getElementById("authPassword").value;
             try {
                 await signInWithEmailAndPassword(auth, email, pass);
-            } catch (e) { alert(e.message); }
+            } catch (e) { alert("အကောင့်ဝင်ခြင်း မအောင်မြင်ပါ: " + e.message); }
         };
 
         window.handleLogout = () => signOut(auth);
 
-        // Chat History Logic
-        async function loadUserHistory() {
+        // Load History List
+        function loadUserHistory() {
             const q = query(collection(db, "chats"), where("userId", "==", currentUser.uid));
             onSnapshot(q, (snapshot) => {
                 const listEl = document.getElementById("historyList");
@@ -189,29 +201,37 @@
                 snapshot.forEach((docSnap) => {
                     const data = docSnap.data();
                     const item = document.createElement("div");
-                    item.className = `history-item ${docSnap.id === currentSessionId ? 'active' : ''}`;
+                    item.className = "history-item";
                     item.innerText = data.title || "စကားဝိုင်း";
-                    item.onclick = () => selectSession(docSnap.id, data.messages);
+                    item.onclick = () => selectSession(docSnap.id, data.title, data.messages);
                     listEl.appendChild(item);
                 });
             });
         }
 
+        // Create New Chat
         window.createNewChat = () => {
             currentSessionId = null;
             activeMessages = [{ role: "system", content: systemPrompt }];
             document.getElementById("chat-box").innerHTML = "";
+            document.getElementById("activeChatTitle").innerText = "စကားဝိုင်းအသစ်";
+            showPage("chat-page");
         };
 
-        function selectSession(id, messages) {
+        // Select Existing Chat
+        function selectSession(id, title, messages) {
             currentSessionId = id;
             activeMessages = messages;
+            document.getElementById("activeChatTitle").innerText = title || "စကားဝိုင်း";
+            
             const chatBox = document.getElementById("chat-box");
             chatBox.innerHTML = "";
             messages.forEach(msg => {
                 if (msg.role === "user") chatBox.innerHTML += `<div class="message user">${msg.content}</div>`;
                 if (msg.role === "assistant") chatBox.innerHTML += `<div class="message bot">${marked.parse(msg.content)}</div>`;
             });
+            
+            showPage("chat-page");
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
@@ -250,11 +270,13 @@
                     activeMessages.push({ role: "assistant", content: aiReply });
                     chatBox.innerHTML += `<div class="message bot">${marked.parse(aiReply)}</div>`;
 
-                    // Save to Firestore Database
+                    // Firestore တွင် သိမ်းဆည်းခြင်း
                     if (!currentSessionId) {
+                        const titleText = text.length > 25 ? text.substring(0, 25) + "..." : text;
+                        document.getElementById("activeChatTitle").innerText = titleText;
                         const newDoc = await addDoc(collection(db, "chats"), {
                             userId: currentUser.uid,
-                            title: text.substring(0, 20),
+                            title: titleText,
                             messages: activeMessages,
                             createdAt: new Date()
                         });
@@ -269,10 +291,10 @@
                 chatBox.scrollTop = chatBox.scrollHeight;
             } catch (err) {
                 document.getElementById(loadingId).remove();
-                chatBox.innerHTML += `<div class="message bot" style="color:red;">Error ဖြစ်ပေါ်နေပါသည်။</div>`;
+                chatBox.innerHTML += `<div class="message bot" style="color:red;">Error ဖြစ်ပေါ်နေပါသည်။ ပြန်လည်ကြိုးစားပေးပါ။</div>`;
             }
         };
     </script>
 </body>
-    </html>
-    
+                </html>
+                                                          
