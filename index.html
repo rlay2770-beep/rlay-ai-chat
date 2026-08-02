@@ -13,13 +13,13 @@
         import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // 🔥 သင့်ရဲ့ Firebase Config Details များကို ဒီမှာ ထည့်သွင်းပါ
+        // 🔥 သင့်ရဲ့ တကယ့် Firebase Config အချက်အလက်များဖြင့် အောက်ပါတို့ကို အစားထိုးပါ
         const firebaseConfig = {
-            apiKey: "YOUR_FIREBASE_API_KEY_HERE",
-            authDomain: "rlays-ai-dictionary.firebaseapp.com",
-            projectId: "rlays-ai-dictionary",
-            storageBucket: "rlays-ai-dictionary.appspot.com",
-            messagingSenderId: "YOUR_SENDER_ID",
+            apiKey: "YOUR_FIREBASE_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
             appId: "YOUR_APP_ID"
         };
 
@@ -34,8 +34,8 @@
             try {
                 await signInWithPopup(auth, provider);
             } catch (error) {
-                console.error("Login Error:", error);
-                alert("အကောင့်ဝင်ခြင်း မအောင်မြင်ပါ။ ပြန်လည်ကြိုးစားပါ။");
+                console.error("Login Error Details:", error);
+                alert("အကောင့်ဝင်ခြင်း မအောင်မြင်ပါ။ Firebase Console တွင် Google Sign-in ကို Enable လုပ်ထားခြင်း ရှိမရှိ စစ်ဆေးပါ။");
             }
         };
 
@@ -48,7 +48,7 @@
             const authBtn = document.getElementById("authBtn");
             if (user) {
                 currentUser = user;
-                authBtn.innerText = "ထွက်မည် (" + user.displayName.split(" ")[0] + ")";
+                authBtn.innerText = "ထွက်မည် (" + (user.displayName ? user.displayName.split(" ")[0] : "User") + ")";
                 authBtn.onclick = window.logoutGoogle;
                 loadUserHistory();
             } else {
@@ -184,7 +184,7 @@
     </div>
 
     <script>
-        const API_KEY = "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";
+        const GROQ_API_KEY = "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";
         
         let activeMessages = [
             { 
@@ -201,7 +201,7 @@
 
         // စာမျက်နှာအသစ် စတင်ခြင်း (New Chat)
         function startNewChat() {
-            activeMessages = [activeMessages[0]]; // Reset message history back to System Prompt
+            activeMessages = [activeMessages[0]]; 
             const chatBox = document.getElementById("chat-box");
             chatBox.innerHTML = `<div class="message bot">မင်္ဂလာပါ! စာမျက်နှာအသစ် စတင်လိုက်ပါပြီ။ ဘာတွေ ကူညီပေးရမလဲခင်ဗျာ။</div>`;
             toggleSidebar();
@@ -234,7 +234,7 @@
             try {
                 const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
                     method: "POST",
-                    headers: { "Authorization": `Bearer ${API_KEY}`, "Content-Type": "application/json" },
+                    headers: { "Authorization": `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
                     body: JSON.stringify({
                         model: "llama-3.3-70b-versatile",
                         messages: activeMessages,
@@ -268,5 +268,5 @@
         }
     </script>
 </body>
-                </html>
-    
+    </html>
+                
