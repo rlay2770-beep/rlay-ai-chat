@@ -15,13 +15,16 @@
 
         // 🔥 သင့်ရဲ့ တကယ့် Firebase Config အချက်အလက်များဖြင့် အောက်ပါတို့ကို အစားထိုးပါ
         const firebaseConfig = {
-            apiKey: "YOUR_FIREBASE_API_KEY",
-            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT_ID.appspot.com",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID"
-        };
+  apiKey: "AIzaSyDOkVig413DDIo1ouusq2qhTIeb3jUMU24",
+  authDomain: "rlay-ai-chat.firebaseapp.com",
+  databaseURL: "https://rlay-ai-chat-default-rtdb.firebaseio.com",
+  projectId: "rlay-ai-chat",
+  storageBucket: "rlay-ai-chat.firebasestorage.app",
+  messagingSenderId: "615991559092",
+  appId: "1:615991559092:web:43ea7ee7b1439ab3dbe8e1",
+  measurementId: "G-PM0242NLLE"
+};
+        
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
