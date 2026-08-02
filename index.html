@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>RLay AI Assistant</title>
-    <!-- Code Blocks များ ပြသရန် Marked.js -->
+    <!-- Marked.js for Code Formatting -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     
     <!-- Firebase SDK Modules -->
@@ -14,15 +14,24 @@
             getAuth, 
             signInWithPopup, 
             signInWithRedirect, 
+            getRedirectResult, 
             GoogleAuthProvider, 
-            createUserWithEmailAndPassword,
-            signInWithEmailAndPassword,
             signOut, 
             onAuthStateChanged, 
             setPersistence, 
             browserLocalPersistence 
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, where, getDocs, deleteDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            query, 
+            where, 
+            getDocs, 
+            deleteDoc, 
+            doc, 
+            serverTimestamp 
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         // Firebase Config
         const firebaseConfig = {
@@ -41,61 +50,49 @@
         const db = getFirestore(app);
         let currentUser = null;
 
-        // Keep Auth State Local
+        // Set Login Persistence
         setPersistence(auth, browserLocalPersistence).catch(console.error);
 
-        // 1. Google Login (One-click Easy Login)
+        // Mobile Redirect Result Handling Fix
+        getRedirectResult(auth).then((result) => {
+            if (result && result.user) {
+                console.log("Redirect Login Successful:", result.user);
+            }
+        }).catch((error) => {
+            console.error("Redirect Error:", error);
+        });
+
+        // Improved Login Function
         window.loginWithGoogle = async function() {
             const provider = new GoogleAuthProvider();
+            // Optional: Ask account picker every time
+            provider.setCustomParameters({ prompt: 'select_account' });
+
             try {
+                // Try Popup First
                 await signInWithPopup(auth, provider);
-                closeAuthModal();
             } catch (error) {
-                console.warn("Popup blocked, trying redirect...", error);
-                try {
-                    await signInWithRedirect(auth, provider);
-                } catch (redErr) {
-                    alert("Google Login Error: " + redErr.message);
+                console.warn("Popup blocked or failed, falling back to Redirect...", error);
+                if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
+                    try {
+                        await signInWithRedirect(auth, provider);
+                    } catch (redErr) {
+                        console.error("Redirect Login Error:", redErr);
+                        alert("Login Error: " + redErr.message);
+                    }
+                } else {
+                    alert("Login Error: " + error.message);
                 }
             }
         };
 
-        // 2. Email Sign Up (အကောင့်သစ်ဖွင့်ခြင်း)
-        window.handleEmailSignUp = async function() {
-            const email = document.getElementById("authEmail").value.trim();
-            const pass = document.getElementById("authPassword").value.trim();
-            if (!email || !pass) return alert("Email နှင့် Password ဖြည့်သွင်းပါခင်ဗျာ။");
-
-            try {
-                await createUserWithEmailAndPassword(auth, email, pass);
-                alert("အကောင့်သစ် အောင်မြင်စွာ ဖန်တီးပြီးပါပြီခင်ဗျာ။");
-                closeAuthModal();
-            } catch (error) {
-                alert("Sign Up Error: " + error.message);
-            }
-        };
-
-        // 3. Email Sign In (အကောင့်ဝင်ခြင်း)
-        window.handleEmailSignIn = async function() {
-            const email = document.getElementById("authEmail").value.trim();
-            const pass = document.getElementById("authPassword").value.trim();
-            if (!email || !pass) return alert("Email နှင့် Password ဖြည့်သွင်းပါခင်ဗျာ။");
-
-            try {
-                await signInWithEmailAndPassword(auth, email, pass);
-                alert("အကောင့်ဝင်ရောက်မှု အောင်မြင်ပါသည်။");
-                closeAuthModal();
-            } catch (error) {
-                alert("Sign In Error: " + error.message);
-            }
-        };
-
-        // Logout
         window.logoutGoogle = async function() {
             try {
                 await signOut(auth);
                 currentUser = null;
-                updateAuthUI(null);
+                const authBtn = document.getElementById("authBtn");
+                authBtn.innerText = "အကောင့်ဝင်ရန်";
+                authBtn.onclick = window.loginWithGoogle;
                 loadLocalHistory();
                 alert("အကောင့်မှ ထွက်ရှိပြီးပါပြီခင်ဗျာ။");
             } catch(e) {
@@ -103,30 +100,22 @@
             }
         };
 
-        // Auth Observer
         onAuthStateChanged(auth, (user) => {
-            currentUser = user;
-            updateAuthUI(user);
+            const authBtn = document.getElementById("authBtn");
             if (user) {
+                currentUser = user;
+                authBtn.innerText = "ထွက်မည် (" + (user.displayName ? user.displayName.split(" ")[0] : "User") + ")";
+                authBtn.onclick = window.logoutGoogle;
                 loadUserHistory();
             } else {
+                currentUser = null;
+                authBtn.innerText = "အကောင့်ဝင်ရန်";
+                authBtn.onclick = window.loginWithGoogle;
                 loadLocalHistory();
             }
         });
 
-        function updateAuthUI(user) {
-            const authBtn = document.getElementById("authBtn");
-            if (user) {
-                const name = user.displayName ? user.displayName.split(" ")[0] : (user.email ? user.email.split("@")[0] : "User");
-                authBtn.innerText = "ထွက်မည် (" + name + ")";
-                authBtn.onclick = window.logoutGoogle;
-            } else {
-                authBtn.innerText = "အကောင့်ဝင်ရန်";
-                authBtn.onclick = openAuthModal;
-            }
-        }
-
-        // Save Chat History
+        // Save History Function
         window.saveChatHistory = async function(userText, aiReplyText) {
             const chatItem = { userMessage: userText, aiResponse: aiReplyText, timestamp: Date.now() };
 
@@ -149,7 +138,7 @@
             renderHistoryList(localData);
         };
 
-        // Clear History
+        // Clear History Function
         window.clearAllHistory = async function() {
             if (!confirm("မှတ်တမ်း အားလုံးကို ဖျက်ရန် သေချာပါသလား?")) return;
 
@@ -257,17 +246,6 @@
         .history-item { padding: 10px; background: #282a2c; border-radius: 8px; font-size: 13px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #c4c7c5; }
         .history-item:hover { background: #333537; }
 
-        /* Auth Modal Box */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 200; }
-        .modal-overlay.active { display: flex; }
-        .modal { background: #1e1f20; border: 1px solid #333; padding: 20px; border-radius: 16px; width: 90%; max-width: 360px; text-align: center; }
-        .modal h3 { margin-top: 0; color: #a8c7fa; }
-        .modal input { width: 100%; padding: 10px; margin: 8px 0; border-radius: 8px; border: 1px solid #333; background: #131314; color: #fff; }
-        .modal-btn { width: 100%; padding: 10px; border-radius: 20px; border: none; font-weight: bold; margin-top: 8px; cursor: pointer; }
-        .btn-google { background: #ea4335; color: white; }
-        .btn-signin { background: #a8c7fa; color: #040c1e; }
-        .btn-signup { background: #282a2c; color: #a8c7fa; border: 1px solid #333; }
-
         /* Chat Area Box */
         #chat-box { 
             flex: 1; 
@@ -309,20 +287,6 @@
 </head>
 <body>
 
-    <!-- Auth Choice Modal Popup -->
-    <div class="modal-overlay" id="authModal">
-        <div class="modal">
-            <h3>အကောင့်ဝင်ရန် / သစ်ဖွင့်ရန်</h3>
-            <button class="modal-btn btn-google" onclick="window.loginWithGoogle()">🌐 Google အကောင့်ဖြင့် လွယ်ကူစွာဝင်မည်</button>
-            <p style="margin: 12px 0; color: #888; font-size: 12px;">-- သို့မဟုတ် Email ဖြင့် --</p>
-            <input type="email" id="authEmail" placeholder="Email လိပ်စာ ရိုက်ပါ...">
-            <input type="password" id="authPassword" placeholder="Password ရိုက်ပါ...">
-            <button class="modal-btn btn-signin" onclick="window.handleEmailSignIn()">အကောင့်ဝင်မည် (Sign In)</button>
-            <button class="modal-btn btn-signup" onclick="window.handleEmailSignUp()">အကောင့်သစ်ဖွင့်မည် (Sign Up)</button>
-            <button class="menu-btn" style="margin-top: 12px; width: 100%;" onclick="closeAuthModal()">မလုပ်ဆောင်တော့ပါ (ပိတ်မည်)</button>
-        </div>
-    </div>
-
     <div class="sidebar-overlay" id="overlay" onclick="toggleSidebar()"></div>
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
@@ -356,6 +320,7 @@
     </div>
 
     <script>
+        // Note: Replace with active keys if revoked by Groq provider
         const GROQ_API_KEYS = [
             "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",
             "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"
@@ -369,14 +334,7 @@
 
         function rotateApiKey() {
             currentKeyIndex = (currentKeyIndex + 1) % GROQ_API_KEYS.length;
-        }
-
-        function openAuthModal() {
-            document.getElementById("authModal").classList.add("active");
-        }
-
-        function closeAuthModal() {
-            document.getElementById("authModal").classList.remove("active");
+            console.log("Switching to next Groq API Key Index:", currentKeyIndex);
         }
 
         function toggleSidebar() {
@@ -410,7 +368,7 @@
             `;
         };
 
-        // Groq API Logic
+        // Groq API Request Logic
         async function fetchGroqAI(text, retryCount = 0) {
             if (retryCount >= GROQ_API_KEYS.length) {
                 throw new Error("RATE_LIMIT_EXCEEDED");
@@ -437,6 +395,7 @@
             const data = await res.json();
 
             if (data.error) {
+                console.warn("API Error encountered, switching key...", data.error);
                 rotateApiKey();
                 return await fetchGroqAI(text, retryCount + 1);
             }
@@ -485,7 +444,7 @@
 
                 let errorDisplay = "ကွန်ရက် ချိတ်ဆက်မှု အခက်အခဲ ရှိနေပါသည်။ ခဏစောင့်ပြီး ထပ်မံ ကြိုးစားပေးပါ။";
                 if (err.message === "RATE_LIMIT_EXCEEDED") {
-                    errorDisplay = "⚠️ <b>Daily Token Limit</b> ပြည့်သွားပါပြီ။ ၁ မိနစ်ခန့် စောင့်ဆိုင်းပေးပါခင်ဗျာ။";
+                    errorDisplay = "⚠️ API Key ဖြင့် ချိတ်ဆက်၍ မရပါ။ (API Key များ သက်တမ်းကုန်/Revoke ဖြစ်သွားခြင်း ဖြစ်နိုင်ပါသည်။)";
                 }
                 chatBox.innerHTML += `<div class="message bot" style="color:#ff8080;">${errorDisplay}</div>`;
             }
@@ -496,4 +455,5 @@
         }
     </script>
 </body>
-</html>
+    </html>
+                                       
