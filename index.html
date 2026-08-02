@@ -10,7 +10,7 @@
     <!-- Firebase SDK Modules -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getAuth, signInWithPopup, signInWithRedirect, GoogleAuthProvider, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, where, getDocs, deleteDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         // Firebase Config
@@ -30,20 +30,37 @@
         const db = getFirestore(app);
         let currentUser = null;
 
-        // Auth Logic
+        // Ensure Login Persistence is set to LOCAL
+        setPersistence(auth, browserLocalPersistence).catch(console.error);
+
+        // Improved Login Logic for Mobile
         window.loginWithGoogle = async function() {
             const provider = new GoogleAuthProvider();
             try {
                 await signInWithPopup(auth, provider);
             } catch (error) {
-                console.error("Login Error:", error);
-                alert("Login Error: " + error.message);
+                console.warn("Popup blocked or failed, trying redirect...", error);
+                try {
+                    await signInWithRedirect(auth, provider);
+                } catch (redErr) {
+                    console.error("Login Error:", redErr);
+                    alert("Login Error: " + redErr.message);
+                }
             }
         };
 
         window.logoutGoogle = async function() {
-            await signOut(auth);
-            location.reload();
+            try {
+                await signOut(auth);
+                currentUser = null;
+                const authBtn = document.getElementById("authBtn");
+                authBtn.innerText = "အကောင့်ဝင်ရန်";
+                authBtn.onclick = window.loginWithGoogle;
+                loadLocalHistory();
+                alert("အကောင့်မှ ထွက်ရှိပြီးပါပြီခင်ဗျာ။");
+            } catch(e) {
+                console.error("Logout Error:", e);
+            }
         };
 
         onAuthStateChanged(auth, (user) => {
@@ -152,7 +169,6 @@
     <style>
         * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         
-        /* Scroll အဆင်ပြေစေရန် body ကို overflow ပြင်ဆင်ထားသည် */
         html, body { 
             margin: 0; 
             padding: 0; 
@@ -193,7 +209,7 @@
         .history-item { padding: 10px; background: #282a2c; border-radius: 8px; font-size: 13px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #c4c7c5; }
         .history-item:hover { background: #333537; }
 
-        /* Chat Area Box - ဖုန်းအတွက် Scroll ပြေပြစ်စေရန် */
+        /* Chat Area Box */
         #chat-box { 
             flex: 1; 
             overflow-y: auto; 
@@ -267,7 +283,6 @@
     </div>
 
     <script>
-        // စစ်မှန်သော Groq API Keys များကို အစဉ်အတိုင်း အလှည့်ကျ သုံးပေးမည့် Array
         const GROQ_API_KEYS = [
             "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",
             "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"
@@ -315,7 +330,7 @@
             `;
         };
 
-        // Groq API Request Logic 
+        // Groq API Request Logic
         async function fetchGroqAI(text, retryCount = 0) {
             if (retryCount >= GROQ_API_KEYS.length) {
                 throw new Error("RATE_LIMIT_EXCEEDED");
@@ -329,10 +344,9 @@
                     "Content-Type": "application/json" 
                 },
                 body: JSON.stringify({
-                    // မြန်ဆန်ပြီး Token Limits အများကြီးရသည့် llama-3.1-8b-instant မော်ဒယ် သို့ ပြောင်းထားပါသည်
                     model: "llama-3.1-8b-instant",
                     messages: [
-                        { role: "system", content: "You are RLay Developer AI, a helpful AI assistant. Answer creatively and concisely in Myanmar language." },
+                        { role: "system", content: "You are RLay Developer AI, an intelligent coding and conversation assistant. Answer clearly, accurately, and naturally in Myanmar language." },
                         { role: "user", content: text }
                     ],
                     temperature: 0.7,
@@ -342,7 +356,6 @@
 
             const data = await res.json();
 
-            // Error တက်ပါက သို့မဟုတ် Limit ပြည့်ပါက နောက် Key သို့ အလိုအလျောက် ပြောင်းသုံးမည်
             if (data.error) {
                 console.warn("API Error encountered, switching key...", data.error);
                 rotateApiKey();
@@ -404,5 +417,5 @@
         }
     </script>
 </body>
-    </html>
-    
+                </html>
+                
