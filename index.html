@@ -11,9 +11,9 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, where, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // 🔥 သင့်ရဲ့ တကယ့် Firebase Config အချက်အလက်များဖြင့် အောက်ပါတို့ကို အစားထိုးပါ
+        // 🔥 သင့်ရဲ့ Firebase Config Details များကို အောက်တွင် ထည့်ပေးပါ
         const firebaseConfig = {
   apiKey: "AIzaSyDOkVig413DDIo1ouusq2qhTIeb3jUMU24",
   authDomain: "rlay-ai-chat.firebaseapp.com",
@@ -31,14 +31,14 @@
         const db = getFirestore(app);
         let currentUser = null;
 
-        // --- Google Sign-In & Auth State ---
+        // Global Object သို့ မဖြစ်မနေ ချိတ်ဆက်ပေးခြင်း
         window.loginWithGoogle = async function() {
             const provider = new GoogleAuthProvider();
             try {
                 await signInWithPopup(auth, provider);
             } catch (error) {
-                console.error("Login Error Details:", error);
-                alert("အကောင့်ဝင်ခြင်း မအောင်မြင်ပါ။ Firebase Console တွင် Google Sign-in ကို Enable လုပ်ထားခြင်း ရှိမရှိ စစ်ဆေးပါ။");
+                console.error("Login Error:", error);
+                alert("Login Error: " + error.message);
             }
         };
 
@@ -61,9 +61,9 @@
             }
         });
 
-        // --- Firestore သို့ Chat သိမ်းဆည်းခြင်း ---
+        // --- Firestore သို့ Chat မေးခွန်းနှင့် အဖြေ သိမ်းဆည်းခြင်း ---
         window.saveChatToFirestore = async function(userText, aiReplyText) {
-            if (!currentUser) return; // အကောင့်ဝင်မထားပါက Database မသိမ်းပါ
+            if (!currentUser) return;
             try {
                 await addDoc(collection(db, "user_chats"), {
                     userId: currentUser.uid,
@@ -71,28 +71,33 @@
                     aiResponse: aiReplyText,
                     timestamp: serverTimestamp()
                 });
-                loadUserHistory(); // History ကို Auto Reload လုပ်ပေးမည်
+                loadUserHistory();
             } catch (e) {
                 console.error("Firestore Save Error: ", e);
             }
         };
 
-        // --- Firestore မှ History ပြန်လည်ယူဆောင်ခြင်း ---
+        // --- Firestore မှ History ပြန်လည်ဆွဲယူခြင်း (Index Error ကင်းလွတ်အောင် ပြင်ထားသည်) ---
         async function loadUserHistory() {
             if (!currentUser) return;
             const historyList = document.getElementById("history-list");
             historyList.innerHTML = "";
 
             try {
+                // Index Error မတက်စေရန် Client-side Sorting အဖြစ် ပြောင်းလဲထားသည်
                 const q = query(
                     collection(db, "user_chats"),
-                    where("userId", "==", currentUser.uid),
-                    orderBy("timestamp", "desc")
+                    where("userId", "==", currentUser.uid)
                 );
                 const querySnapshot = await getDocs(q);
                 
-                querySnapshot.forEach((doc) => {
-                    const data = doc.data();
+                let docs = [];
+                querySnapshot.forEach(doc => docs.push(doc.data()));
+                
+                // Timestamp အလိုက် client-side တွင် ဖြန့်စီခြင်း
+                docs.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+
+                docs.forEach((data) => {
                     const item = document.createElement("div");
                     item.className = "history-item";
                     item.innerText = data.userMessage;
@@ -112,26 +117,54 @@
         * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         body { margin: 0; background-color: #131314; color: #e3e3e3; height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
 
-        /* Header UI & Sidebar Toggle Button */
+        /* Header UI Layering Fix */
         .header { padding: 12px 16px; background: #1e1f20; border-bottom: 1px solid #2e2f31; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
         .header-left { display: flex; align-items: center; gap: 12px; }
         .header h3 { margin: 0; color: #a8c7fa; font-size: 16px; font-weight: 600; }
         .menu-btn, .auth-btn, .new-chat-btn { background: #282a2c; border: 1px solid #333; color: #e3e3e3; padding: 6px 12px; border-radius: 18px; font-size: 13px; cursor: pointer; }
         .auth-btn { background: #a8c7fa; color: #040c1e; font-weight: bold; border: none; }
 
-        /* Sidebar Navigation Layout (တစ်ဖက်စာမျက်နှာ / History Drawer) */
-        .sidebar { position: fixed; top: 0; left: -280px; width: 280px; height: 100%; background: #1e1f20; border-right: 1px solid #2e2f31; transition: 0.3s ease; z-index: 100; display: flex; flex-direction: column; padding: 16px; }
+        /* UI Frozen / Click Blocked Fix (Overlay & Sidebar) */
+        .sidebar-overlay { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: rgba(0,0,0,0.5); 
+            opacity: 0; 
+            pointer-events: none; /* UI ပိတ်မနေစေရန် အရေးကြီးသော ပြင်ဆင်ချက် */
+            transition: opacity 0.3s ease; 
+            z-index: 99; 
+        }
+        .sidebar-overlay.active { 
+            opacity: 1; 
+            pointer-events: auto; 
+        }
+
+        .sidebar { 
+            position: fixed; 
+            top: 0; 
+            left: -280px; 
+            width: 280px; 
+            height: 100%; 
+            background: #1e1f20; 
+            border-right: 1px solid #2e2f31; 
+            transition: left 0.3s ease; 
+            z-index: 100; 
+            display: flex; 
+            flex-direction: column; 
+            padding: 16px; 
+        }
         .sidebar.active { left: 0; }
         .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .sidebar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; z-index: 99; }
-        .sidebar-overlay.active { display: block; }
         
         .history-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
         .history-item { padding: 10px; background: #282a2c; border-radius: 8px; font-size: 13px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #c4c7c5; }
         .history-item:hover { background: #333537; }
 
-        /* Chat Area */
-        #chat-box { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+        /* Chat Area Scroll Fix */
+        #chat-box { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; -webkit-overflow-scrolling: touch; }
         .message { max-width: 90%; padding: 12px 16px; border-radius: 16px; font-size: 15px; line-height: 1.6; word-wrap: break-word; }
         .user { background: #282a2c; color: #e3e3e3; align-self: flex-end; border-bottom-right-radius: 4px; }
         .bot { background: #1e1f20; color: #c4c7c5; align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid #2e2f31; }
@@ -196,13 +229,13 @@
             }
         ];
 
-        // Sidebar Drawer Toggle Function
+        // Sidebar Toggle Function
         function toggleSidebar() {
             document.getElementById("sidebar").classList.toggle("active");
             document.getElementById("overlay").classList.toggle("active");
         }
 
-        // စာမျက်နှာအသစ် စတင်ခြင်း (New Chat)
+        // New Chat Start
         function startNewChat() {
             activeMessages = [activeMessages[0]]; 
             const chatBox = document.getElementById("chat-box");
@@ -210,7 +243,7 @@
             toggleSidebar();
         }
 
-        // History မှ ရွေးချယ်သော မေးခွန်းနှင့် အဖြေအား UI တွင် ပြသခြင်း
+        // Render History
         window.renderHistoricalChat = function(userMsg, aiReply) {
             const chatBox = document.getElementById("chat-box");
             chatBox.innerHTML = `
@@ -254,7 +287,7 @@
                     
                     chatBox.innerHTML += `<div class="message bot">${marked.parse(aiReply)}</div>`;
 
-                    // Firestore သို့ Auto Save လုပ်ခြင်း
+                    // Firestore Auto Save
                     if (window.saveChatToFirestore) {
                         window.saveChatToFirestore(text, aiReply);
                     }
@@ -272,4 +305,4 @@
     </script>
 </body>
     </html>
-                
+            
