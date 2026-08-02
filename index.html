@@ -7,12 +7,13 @@
     <!-- Code Blocks များ သေချာ ပြသရန် Marked.js ထည့်သွင်းခြင်း -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     
-    <!-- Firebase SDK Modules ထည့်သွင်းခြင်း (Firestore API သုံးနိုင်ရန်) -->
+    <!-- Firebase SDK Modules (Auth & Firestore) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // 🔥 သင့်ရဲ့ Firebase/Firestore Config Details များကို ဒီမှာ ထည့်သွင်းပါ
+        // 🔥 သင့်ရဲ့ Firebase Config Details များကို ဒီမှာ ထည့်သွင်းပါ
         const firebaseConfig = {
             apiKey: "YOUR_FIREBASE_API_KEY_HERE",
             authDomain: "rlays-ai-dictionary.firebaseapp.com",
@@ -22,32 +23,109 @@
             appId: "YOUR_APP_ID"
         };
 
-        // Firebase / Firestore Initialize လုပ်ခြင်း
         const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
         const db = getFirestore(app);
+        let currentUser = null;
 
-        // Global scope သို့ Firestore Function များကို ပို့ပေးခြင်း
-        window.saveChatToFirestore = async function(userText, aiReplyText) {
+        // --- Google Sign-In & Auth State ---
+        window.loginWithGoogle = async function() {
+            const provider = new GoogleAuthProvider();
             try {
-                await addDoc(collection(db, "chat_history"), {
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error("Login Error:", error);
+                alert("အကောင့်ဝင်ခြင်း မအောင်မြင်ပါ။ ပြန်လည်ကြိုးစားပါ။");
+            }
+        };
+
+        window.logoutGoogle = async function() {
+            await signOut(auth);
+            location.reload();
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            const authBtn = document.getElementById("authBtn");
+            if (user) {
+                currentUser = user;
+                authBtn.innerText = "ထွက်မည် (" + user.displayName.split(" ")[0] + ")";
+                authBtn.onclick = window.logoutGoogle;
+                loadUserHistory();
+            } else {
+                currentUser = null;
+                authBtn.innerText = "အကောင့်ဝင်ရန်";
+                authBtn.onclick = window.loginWithGoogle;
+            }
+        });
+
+        // --- Firestore သို့ Chat သိမ်းဆည်းခြင်း ---
+        window.saveChatToFirestore = async function(userText, aiReplyText) {
+            if (!currentUser) return; // အကောင့်ဝင်မထားပါက Database မသိမ်းပါ
+            try {
+                await addDoc(collection(db, "user_chats"), {
+                    userId: currentUser.uid,
                     userMessage: userText,
                     aiResponse: aiReplyText,
                     timestamp: serverTimestamp()
                 });
-                console.log("Chat successfully saved to Firestore!");
+                loadUserHistory(); // History ကို Auto Reload လုပ်ပေးမည်
             } catch (e) {
-                console.error("Error adding document to Firestore: ", e);
+                console.error("Firestore Save Error: ", e);
             }
         };
+
+        // --- Firestore မှ History ပြန်လည်ယူဆောင်ခြင်း ---
+        async function loadUserHistory() {
+            if (!currentUser) return;
+            const historyList = document.getElementById("history-list");
+            historyList.innerHTML = "";
+
+            try {
+                const q = query(
+                    collection(db, "user_chats"),
+                    where("userId", "==", currentUser.uid),
+                    orderBy("timestamp", "desc")
+                );
+                const querySnapshot = await getDocs(q);
+                
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const item = document.createElement("div");
+                    item.className = "history-item";
+                    item.innerText = data.userMessage;
+                    item.onclick = () => {
+                        window.renderHistoricalChat(data.userMessage, data.aiResponse);
+                        window.toggleSidebar();
+                    };
+                    historyList.appendChild(item);
+                });
+            } catch (e) {
+                console.error("History Loading Error:", e);
+            }
+        }
     </script>
 
     <style>
         * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         body { margin: 0; background-color: #131314; color: #e3e3e3; height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
 
-        /* Header UI */
-        .header { padding: 14px 20px; background: #1e1f20; border-bottom: 1px solid #2e2f31; display: flex; justify-content: space-between; align-items: center; }
+        /* Header UI & Sidebar Toggle Button */
+        .header { padding: 12px 16px; background: #1e1f20; border-bottom: 1px solid #2e2f31; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
+        .header-left { display: flex; align-items: center; gap: 12px; }
         .header h3 { margin: 0; color: #a8c7fa; font-size: 16px; font-weight: 600; }
+        .menu-btn, .auth-btn, .new-chat-btn { background: #282a2c; border: 1px solid #333; color: #e3e3e3; padding: 6px 12px; border-radius: 18px; font-size: 13px; cursor: pointer; }
+        .auth-btn { background: #a8c7fa; color: #040c1e; font-weight: bold; border: none; }
+
+        /* Sidebar Navigation Layout (တစ်ဖက်စာမျက်နှာ / History Drawer) */
+        .sidebar { position: fixed; top: 0; left: -280px; width: 280px; height: 100%; background: #1e1f20; border-right: 1px solid #2e2f31; transition: 0.3s ease; z-index: 100; display: flex; flex-direction: column; padding: 16px; }
+        .sidebar.active { left: 0; }
+        .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .sidebar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; z-index: 99; }
+        .sidebar-overlay.active { display: block; }
+        
+        .history-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .history-item { padding: 10px; background: #282a2c; border-radius: 8px; font-size: 13px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #c4c7c5; }
+        .history-item:hover { background: #333537; }
 
         /* Chat Area */
         #chat-box { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
@@ -55,7 +133,7 @@
         .user { background: #282a2c; color: #e3e3e3; align-self: flex-end; border-bottom-right-radius: 4px; }
         .bot { background: #1e1f20; color: #c4c7c5; align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid #2e2f31; }
 
-        /* Code Block Styling (Gemini Style) */
+        /* Code Block Styling */
         pre { background: #0d0e0f; padding: 12px; border-radius: 8px; overflow-x: auto; border: 1px solid #333; margin: 8px 0; }
         code { font-family: monospace; color: #75beff; font-size: 14px; }
 
@@ -68,14 +146,36 @@
 </head>
 <body>
 
-    <div class="header">
-        <h3>✨ RLay Developer AI</h3>
+    <!-- Overlay & Sidebar Drawer -->
+    <div class="sidebar-overlay" id="overlay" onclick="toggleSidebar()"></div>
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h4 style="margin:0; color:#a8c7fa;">Chat History</h4>
+            <button class="menu-btn" onclick="toggleSidebar()">✕</button>
+        </div>
+        <button class="new-chat-btn" style="width: 100%; margin-bottom: 12px;" onclick="startNewChat()">+ စာမျက်နှာအသစ် (New Chat)</button>
+        <div class="history-list" id="history-list">
+            <!-- Dynamic History List Items -->
+        </div>
     </div>
 
+    <!-- Header Section -->
+    <div class="header">
+        <div class="header-left">
+            <button class="menu-btn" onclick="toggleSidebar()">☰ History</button>
+            <h3>✨ RLay Developer AI</h3>
+        </div>
+        <div>
+            <button class="auth-btn" id="authBtn">အကောင့်ဝင်ရန်</button>
+        </div>
+    </div>
+
+    <!-- Chat Message Container -->
     <div id="chat-box">
         <div class="message bot">မင်္ဂလာပါ! ကျွန်တော်က RLay Developer AI ဖြစ်ပါတယ်။ HTML/CSS/JS Coding နဲ့ Web-to-App ဖန်တီးမှုတွေမှာ ဘာတွေ ကူညီပေးရမလဲခင်ဗျာ။</div>
     </div>
 
+    <!-- Chat Input Section -->
     <div class="input-area-wrapper">
         <div class="input-area">
             <input type="text" id="userInput" placeholder="Coding သို့မဟုတ် တစ်ခုခု မေးမြန်းပါ..." onkeypress="if(event.key==='Enter') sendMessage()">
@@ -86,13 +186,35 @@
     <script>
         const API_KEY = "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";
         
-        // Gemini ကဲ့သို့ Coding Expert အဖြစ် ပြုမူစေမည့် System Prompt
-        const activeMessages = [
+        let activeMessages = [
             { 
                 role: "system", 
                 content: "You are RLay AI, an expert software developer and Web Coding specialist. You help users build websites and mobile apps, especially for users coding on mobile devices. When asked for code (like HTML, CSS, JavaScript), write clean, complete, and functional code inside Markdown code blocks. Always respond in fluent, accurate, and natural Myanmar language." 
             }
         ];
+
+        // Sidebar Drawer Toggle Function
+        function toggleSidebar() {
+            document.getElementById("sidebar").classList.toggle("active");
+            document.getElementById("overlay").classList.toggle("active");
+        }
+
+        // စာမျက်နှာအသစ် စတင်ခြင်း (New Chat)
+        function startNewChat() {
+            activeMessages = [activeMessages[0]]; // Reset message history back to System Prompt
+            const chatBox = document.getElementById("chat-box");
+            chatBox.innerHTML = `<div class="message bot">မင်္ဂလာပါ! စာမျက်နှာအသစ် စတင်လိုက်ပါပြီ။ ဘာတွေ ကူညီပေးရမလဲခင်ဗျာ။</div>`;
+            toggleSidebar();
+        }
+
+        // History မှ ရွေးချယ်သော မေးခွန်းနှင့် အဖြေအား UI တွင် ပြသခြင်း
+        window.renderHistoricalChat = function(userMsg, aiReply) {
+            const chatBox = document.getElementById("chat-box");
+            chatBox.innerHTML = `
+                <div class="message user">${escapeHtml(userMsg)}</div>
+                <div class="message bot">${marked.parse(aiReply)}</div>
+            `;
+        };
 
         async function sendMessage() {
             const input = document.getElementById("userInput");
@@ -127,10 +249,9 @@
                     const aiReply = data.choices[0].message.content;
                     activeMessages.push({ role: "assistant", content: aiReply });
                     
-                    // Marked.js ဖြင့် Code Block များကို သန့်ရှင်းစွာ Render လုပ်ခြင်း
                     chatBox.innerHTML += `<div class="message bot">${marked.parse(aiReply)}</div>`;
 
-                    // 🔥 Firestore ထဲသို့ User မေးခွန်းနှင့် AI ပြန်ဖြေချက်ကို Auto Cloud Sync/Save လုပ်ခြင်း
+                    // Firestore သို့ Auto Save လုပ်ခြင်း
                     if (window.saveChatToFirestore) {
                         window.saveChatToFirestore(text, aiReply);
                     }
@@ -147,4 +268,5 @@
         }
     </script>
 </body>
-</html>
+                </html>
+    
