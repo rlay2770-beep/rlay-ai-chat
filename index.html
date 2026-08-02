@@ -88,10 +88,8 @@
         window.clearAllHistory = async function() {
             if (!confirm("မှတ်တမ်း အားလုံးကို ဖျက်ရန် သေချာပါသလား?")) return;
 
-            // Clear LocalStorage
             localStorage.removeItem("rlay_ai_history");
 
-            // Clear Firestore Database (If User Logged In)
             if (currentUser) {
                 try {
                     const q = query(collection(db, "user_chats"), where("userId", "==", currentUser.uid));
@@ -106,7 +104,6 @@
                 }
             }
 
-            // UI Refresh
             renderHistoryList([]);
             alert("မှတ်တမ်းများ အားလုံးကို ရှင်းလင်းပြီးပါပြီခင်ဗျာ။");
         };
@@ -243,7 +240,7 @@
         
         const systemPrompt = { 
             role: "system", 
-            content: "You are RLay AI, an expert software developer and Web Coding specialist. Respond concisely and effectively in Myanmar language." 
+            content: "You are RLay AI, a helpful coding assistant. Respond concisely and effectively in Myanmar language." 
         };
 
         let activeMessages = [systemPrompt];
@@ -293,10 +290,10 @@
 
             activeMessages.push({ role: "user", content: text });
 
-            // Token မကုန်အောင် နောက်ဆုံး စာကြောင်း ၆ ကြောင်းပဲ API ကို ပို့မည်
+            // ⚡ Token အလွန်အမင်း မကုန်စေရန် နောက်ဆုံး စာကြောင်း (၄) ကြောင်းသာ ပို့မည် (Smart Context)
             let trimmedMessages = [systemPrompt];
-            if (activeMessages.length > 6) {
-                trimmedMessages = [systemPrompt, ...activeMessages.slice(-6)];
+            if (activeMessages.length > 4) {
+                trimmedMessages = [systemPrompt, ...activeMessages.slice(-4)];
             } else {
                 trimmedMessages = activeMessages;
             }
@@ -316,7 +313,7 @@
                         model: "llama-3.3-70b-versatile",
                         messages: trimmedMessages,
                         temperature: 0.5,
-                        max_tokens: 1024 // Token limit ကို 1024 သို့ လျှော့ချထားပါသည်
+                        max_tokens: 512 // ⚡ Token ကုန်သက်သာစေရန် 512 သို့ အကောင်းဆုံး ချုံ့ပေးထားသည်
                     })
                 });
 
@@ -336,7 +333,14 @@
                     }
                 } else if (data.error) {
                     console.error("Groq API Error:", data.error);
-                    chatBox.innerHTML += `<div class="message bot" style="color:#ff8080;">${data.error.message}</div>`;
+                    let errorMsg = data.error.message;
+                    
+                    // အကယ်၍ Rate Limit (Daily Limit) ပြည့်သွားပါက သုံးစွဲသူ နားလည်လွယ်အောင် ပြသပေးရန်
+                    if (errorMsg.includes("Rate limit reached") || errorMsg.includes("TPD")) {
+                        errorMsg = "⚠️ <b>Daily Token Limit (တစ်နေ့တာ အသုံးပြုခွင့်)</b> ပြည့်သွားပါပြီ။ 24 နာရီပြည့်မှ သို့မဟုတ် API Key အသစ် လဲလှယ်သုံးစွဲမှသာ အလုပ်လုပ်ပါမည်။";
+                    }
+                    
+                    chatBox.innerHTML += `<div class="message bot" style="color:#ff8080;">${errorMsg}</div>`;
                 }
                 
                 chatBox.scrollTop = chatBox.scrollHeight;
@@ -353,4 +357,5 @@
         }
     </script>
 </body>
-</html>
+    </html>
+        
