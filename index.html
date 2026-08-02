@@ -11,7 +11,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, where, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, where, getDocs, deleteDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         // Firebase Config
         const firebaseConfig = {
@@ -61,7 +61,7 @@
             }
         });
 
-        // History Storage Logic
+        // Save Chat History
         window.saveChatHistory = async function(userText, aiReplyText) {
             const chatItem = { userMessage: userText, aiResponse: aiReplyText, timestamp: Date.now() };
 
@@ -82,6 +82,33 @@
                 }
             }
             renderHistoryList(localData);
+        };
+
+        // Clear All History Function
+        window.clearAllHistory = async function() {
+            if (!confirm("မှတ်တမ်း အားလုံးကို ဖျက်ရန် သေချာပါသလား?")) return;
+
+            // Clear LocalStorage
+            localStorage.removeItem("rlay_ai_history");
+
+            // Clear Firestore Database (If User Logged In)
+            if (currentUser) {
+                try {
+                    const q = query(collection(db, "user_chats"), where("userId", "==", currentUser.uid));
+                    const querySnapshot = await getDocs(q);
+                    const deletePromises = [];
+                    querySnapshot.forEach((document) => {
+                        deletePromises.push(deleteDoc(doc(db, "user_chats", document.id)));
+                    });
+                    await Promise.all(deletePromises);
+                } catch (e) {
+                    console.error("Error clearing Firebase history:", e);
+                }
+            }
+
+            // UI Refresh
+            renderHistoryList([]);
+            alert("မှတ်တမ်းများ အားလုံးကို ရှင်းလင်းပြီးပါပြီခင်ဗျာ။");
         };
 
         function loadLocalHistory() {
@@ -132,8 +159,9 @@
         .header { padding: 12px 16px; background: #1e1f20; border-bottom: 1px solid #2e2f31; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
         .header-left { display: flex; align-items: center; gap: 12px; }
         .header h3 { margin: 0; color: #a8c7fa; font-size: 16px; font-weight: 600; }
-        .menu-btn, .auth-btn, .new-chat-btn { background: #282a2c; border: 1px solid #333; color: #e3e3e3; padding: 6px 12px; border-radius: 18px; font-size: 13px; cursor: pointer; }
+        .menu-btn, .auth-btn, .new-chat-btn, .clear-btn { background: #282a2c; border: 1px solid #333; color: #e3e3e3; padding: 6px 12px; border-radius: 18px; font-size: 13px; cursor: pointer; }
         .auth-btn { background: #a8c7fa; color: #040c1e; font-weight: bold; border: none; }
+        .clear-btn { background: #3b1d1d; color: #f2b8b8; border: 1px solid #602323; margin-top: 8px; }
 
         /* Drawer Overlay */
         .sidebar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); opacity: 0; pointer-events: none; transition: opacity 0.3s ease; z-index: 99; }
@@ -141,13 +169,13 @@
 
         .sidebar { position: fixed; top: 0; left: -280px; width: 280px; height: 100%; background: #1e1f20; border-right: 1px solid #2e2f31; transition: left 0.3s ease; z-index: 100; display: flex; flex-direction: column; padding: 16px; }
         .sidebar.active { left: 0; }
-        .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
         
         .history-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
         .history-item { padding: 10px; background: #282a2c; border-radius: 8px; font-size: 13px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #c4c7c5; }
         .history-item:hover { background: #333537; }
 
-        /* Chat Area Box Fixes */
+        /* Chat Area Box */
         #chat-box { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; -webkit-overflow-scrolling: touch; }
         .message { max-width: 90%; padding: 12px 16px; border-radius: 16px; font-size: 15px; line-height: 1.6; word-wrap: break-word; }
         .user { background: #282a2c; color: #e3e3e3; align-self: flex-end; border-bottom-right-radius: 4px; }
@@ -156,7 +184,6 @@
         pre { background: #0d0e0f; padding: 12px; border-radius: 8px; overflow-x: auto; border: 1px solid #333; margin: 8px 0; white-space: pre-wrap; word-break: break-all; }
         code { font-family: monospace; color: #75beff; font-size: 14px; }
 
-        /* Textarea / Input Fixes for long messages */
         .input-area-wrapper { padding: 12px 16px; background: #131314; border-top: 1px solid #2e2f31; }
         .input-area { max-width: 800px; margin: 0 auto; display: flex; background: #1e1f20; border-radius: 24px; padding: 6px 8px 6px 16px; border: 1px solid #333; align-items: flex-end; }
         
@@ -185,7 +212,8 @@
             <h4 style="margin:0; color:#a8c7fa;">Chat History</h4>
             <button class="menu-btn" onclick="toggleSidebar()">✕</button>
         </div>
-        <button class="new-chat-btn" style="width: 100%; margin-bottom: 12px;" onclick="startNewChat()">+ စာမျက်နှာအသစ် (New Chat)</button>
+        <button class="new-chat-btn" style="width: 100%; margin-bottom: 8px;" onclick="startNewChat()">+ စာမျက်နှာအသစ် (New Chat)</button>
+        <button class="clear-btn" style="width: 100%; margin-bottom: 12px;" onclick="window.clearAllHistory()">🗑️ မှတ်တမ်းများဖျက်မည် (Clear All)</button>
         <div class="history-list" id="history-list"></div>
     </div>
 
@@ -215,7 +243,7 @@
         
         const systemPrompt = { 
             role: "system", 
-            content: "You are RLay AI, an expert software developer and Web Coding specialist. You help users build websites and mobile apps. Write clean code in Markdown code blocks and respond in fluent Myanmar language." 
+            content: "You are RLay AI, an expert software developer and Web Coding specialist. Respond concisely and effectively in Myanmar language." 
         };
 
         let activeMessages = [systemPrompt];
@@ -260,16 +288,15 @@
             const chatBox = document.getElementById("chat-box");
             chatBox.innerHTML += `<div class="message user">${escapeHtml(text)}</div>`;
             
-            // Input Reset
             input.value = "";
             input.style.height = "24px";
 
             activeMessages.push({ role: "user", content: text });
 
-            // Context အလွန်အမင်း မရှည်သွားစေရန် စီမံခြင်း (နောက်ဆုံး 10 စာကြောင်းပဲ API သို့ ပို့မည်)
+            // Token မကုန်အောင် နောက်ဆုံး စာကြောင်း ၆ ကြောင်းပဲ API ကို ပို့မည်
             let trimmedMessages = [systemPrompt];
-            if (activeMessages.length > 10) {
-                trimmedMessages = [systemPrompt, ...activeMessages.slice(-10)];
+            if (activeMessages.length > 6) {
+                trimmedMessages = [systemPrompt, ...activeMessages.slice(-6)];
             } else {
                 trimmedMessages = activeMessages;
             }
@@ -289,7 +316,7 @@
                         model: "llama-3.3-70b-versatile",
                         messages: trimmedMessages,
                         temperature: 0.5,
-                        max_tokens: 4096 // 🔥 စာအရှည်ကြီး အဖြေပြန်ပေးနိုင်ရန် ထည့်သွင်းထားသည်
+                        max_tokens: 1024 // Token limit ကို 1024 သို့ လျှော့ချထားပါသည်
                     })
                 });
 
@@ -309,7 +336,7 @@
                     }
                 } else if (data.error) {
                     console.error("Groq API Error:", data.error);
-                    chatBox.innerHTML += `<div class="message bot" style="color:red;">API Error: ${data.error.message}</div>`;
+                    chatBox.innerHTML += `<div class="message bot" style="color:#ff8080;">${data.error.message}</div>`;
                 }
                 
                 chatBox.scrollTop = chatBox.scrollHeight;
@@ -317,7 +344,7 @@
                 console.error("Fetch Error:", err);
                 const loader = document.getElementById(loadingId);
                 if(loader) loader.remove();
-                chatBox.innerHTML += `<div class="message bot" style="color:red;">ကွန်ရက် ချိတ်ဆက်မှု Error ဖြစ်ပေါ်နေပါသည်။ ပြန်လည်ကြိုးစားပေးပါ။</div>`;
+                chatBox.innerHTML += `<div class="message bot" style="color:#ff8080;">ကွန်ရက် ချိတ်ဆက်မှု Error ဖြစ်ပေါ်နေပါသည်။ ပြန်လည်ကြိုးစားပေးပါ။</div>`;
             }
         }
 
@@ -326,5 +353,4 @@
         }
     </script>
 </body>
-    </html>
-    
+</html>
