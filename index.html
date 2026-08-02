@@ -13,7 +13,7 @@
         import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, where, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // 🔥 ဆရာပေးထားသော Firebase Config 
+        // Firebase Config
         const firebaseConfig = {
             apiKey: "AIzaSyDOkVig413DDIo1ouusq2qhTIeb3jUMU24",
             authDomain: "rlay-ai-chat.firebaseapp.com",
@@ -30,14 +30,14 @@
         const db = getFirestore(app);
         let currentUser = null;
 
-        // Login & Logout Functions
+        // Auth Logic
         window.loginWithGoogle = async function() {
             const provider = new GoogleAuthProvider();
             try {
                 await signInWithPopup(auth, provider);
             } catch (error) {
                 console.error("Login Error:", error);
-                alert("Login မဝင်နိုင်သေးပါ။ ပြန်လည်ကြိုးစားပေးပါ: " + error.message);
+                alert("Login Error: " + error.message);
             }
         };
 
@@ -57,20 +57,18 @@
                 currentUser = null;
                 authBtn.innerText = "အကောင့်ဝင်ရန်";
                 authBtn.onclick = window.loginWithGoogle;
-                loadLocalHistory(); // အကောင့်မဝင်ထားပါက LocalStorage မှ ယူမည်
+                loadLocalHistory();
             }
         });
 
-        // 🔥 Double Storage Sync (Cloud Firestore + Phone LocalStorage)
+        // History Storage Logic
         window.saveChatHistory = async function(userText, aiReplyText) {
             const chatItem = { userMessage: userText, aiResponse: aiReplyText, timestamp: Date.now() };
 
-            // ၁။ ဖုန်းထဲတွင် LocalStorage ဖြင့် အမြဲတမ်း သိမ်းဆည်းခြင်း (ဖုန်းပိတ်သော်လည်း မပျောက်ပါ)
             let localData = JSON.parse(localStorage.getItem("rlay_ai_history") || "[]");
             localData.unshift(chatItem);
             localStorage.setItem("rlay_ai_history", JSON.stringify(localData));
 
-            // ၂။ Firebase Cloud ထဲတွင် သိမ်းဆည်းခြင်း (အကောင့်ဝင်ထားလျှင်)
             if (currentUser) {
                 try {
                     await addDoc(collection(db, "user_chats"), {
@@ -83,20 +81,16 @@
                     console.error("Firestore Save Error: ", e);
                 }
             }
-            
             renderHistoryList(localData);
         };
 
-        // Phone Local Storage မှ History ပြန်လည်ယူခြင်း
         function loadLocalHistory() {
             let localData = JSON.parse(localStorage.getItem("rlay_ai_history") || "[]");
             renderHistoryList(localData);
         }
 
-        // Firebase Cloud မှ History ပြန်လည်ယူခြင်း
         async function loadUserHistory() {
             if (!currentUser) return loadLocalHistory();
-            
             try {
                 const q = query(collection(db, "user_chats"), where("userId", "==", currentUser.uid));
                 const querySnapshot = await getDocs(q);
@@ -110,16 +104,14 @@
                     loadLocalHistory();
                 }
             } catch (e) {
-                console.error("Cloud History Error, loading local:", e);
+                console.error("Cloud History Error:", e);
                 loadLocalHistory();
             }
         }
 
-        // History စာရင်းကို Sidebar တွင် ရေးဆွဲပေးခြင်း
         function renderHistoryList(items) {
             const historyList = document.getElementById("history-list");
             historyList.innerHTML = "";
-
             items.forEach((data) => {
                 const item = document.createElement("div");
                 item.className = "history-item";
@@ -143,7 +135,7 @@
         .menu-btn, .auth-btn, .new-chat-btn { background: #282a2c; border: 1px solid #333; color: #e3e3e3; padding: 6px 12px; border-radius: 18px; font-size: 13px; cursor: pointer; }
         .auth-btn { background: #a8c7fa; color: #040c1e; font-weight: bold; border: none; }
 
-        /* Sidebar & Overlay UI (Scroll/Frozen Fix) */
+        /* Drawer Overlay */
         .sidebar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); opacity: 0; pointer-events: none; transition: opacity 0.3s ease; z-index: 99; }
         .sidebar-overlay.active { opacity: 1; pointer-events: auto; }
 
@@ -155,25 +147,38 @@
         .history-item { padding: 10px; background: #282a2c; border-radius: 8px; font-size: 13px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #c4c7c5; }
         .history-item:hover { background: #333537; }
 
-        /* Chat Area */
+        /* Chat Area Box Fixes */
         #chat-box { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; -webkit-overflow-scrolling: touch; }
         .message { max-width: 90%; padding: 12px 16px; border-radius: 16px; font-size: 15px; line-height: 1.6; word-wrap: break-word; }
         .user { background: #282a2c; color: #e3e3e3; align-self: flex-end; border-bottom-right-radius: 4px; }
         .bot { background: #1e1f20; color: #c4c7c5; align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid #2e2f31; }
 
-        pre { background: #0d0e0f; padding: 12px; border-radius: 8px; overflow-x: auto; border: 1px solid #333; margin: 8px 0; }
+        pre { background: #0d0e0f; padding: 12px; border-radius: 8px; overflow-x: auto; border: 1px solid #333; margin: 8px 0; white-space: pre-wrap; word-break: break-all; }
         code { font-family: monospace; color: #75beff; font-size: 14px; }
 
-        /* Input Area */
+        /* Textarea / Input Fixes for long messages */
         .input-area-wrapper { padding: 12px 16px; background: #131314; border-top: 1px solid #2e2f31; }
-        .input-area { max-width: 800px; margin: 0 auto; display: flex; background: #1e1f20; border-radius: 28px; padding: 4px 8px 4px 16px; border: 1px solid #333; }
-        input[type="text"] { flex: 1; background: transparent; border: none; color: #fff; font-size: 15px; outline: none; }
-        button.send-btn { background: #a8c7fa; color: #040c1e; border: none; border-radius: 20px; padding: 8px 18px; font-weight: bold; cursor: pointer; }
+        .input-area { max-width: 800px; margin: 0 auto; display: flex; background: #1e1f20; border-radius: 24px; padding: 6px 8px 6px 16px; border: 1px solid #333; align-items: flex-end; }
+        
+        textarea#userInput { 
+            flex: 1; 
+            background: transparent; 
+            border: none; 
+            color: #fff; 
+            font-size: 15px; 
+            outline: none; 
+            resize: none; 
+            max-height: 120px; 
+            height: 24px; 
+            line-height: 24px;
+            padding: 0;
+            margin-bottom: 4px;
+        }
+        button.send-btn { background: #a8c7fa; color: #040c1e; border: none; border-radius: 20px; padding: 8px 18px; font-weight: bold; cursor: pointer; height: 36px; }
     </style>
 </head>
 <body>
 
-    <!-- Overlay & Sidebar Drawer -->
     <div class="sidebar-overlay" id="overlay" onclick="toggleSidebar()"></div>
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
@@ -181,12 +186,9 @@
             <button class="menu-btn" onclick="toggleSidebar()">✕</button>
         </div>
         <button class="new-chat-btn" style="width: 100%; margin-bottom: 12px;" onclick="startNewChat()">+ စာမျက်နှာအသစ် (New Chat)</button>
-        <div class="history-list" id="history-list">
-            <!-- Dynamic History -->
-        </div>
+        <div class="history-list" id="history-list"></div>
     </div>
 
-    <!-- Header Section -->
     <div class="header">
         <div class="header-left">
             <button class="menu-btn" onclick="toggleSidebar()">☰ History</button>
@@ -197,15 +199,13 @@
         </div>
     </div>
 
-    <!-- Chat Message Container -->
     <div id="chat-box">
         <div class="message bot">မင်္ဂလာပါ! ကျွန်တော်က RLay Developer AI ဖြစ်ပါတယ်။ HTML/CSS/JS Coding နဲ့ Web-to-App ဖန်တီးမှုတွေမှာ ဘာတွေ ကူညီပေးရမလဲခင်ဗျာ။</div>
     </div>
 
-    <!-- Chat Input Section -->
     <div class="input-area-wrapper">
         <div class="input-area">
-            <input type="text" id="userInput" placeholder="Coding သို့မဟုတ် တစ်ခုခု မေးမြန်းပါ..." onkeypress="if(event.key==='Enter') sendMessage()">
+            <textarea id="userInput" placeholder="Coding သို့မဟုတ် တစ်ခုခု မေးမြန်းပါ..." rows="1" oninput="autoResize(this)" onkeydown="handleKeyDown(event)"></textarea>
             <button class="send-btn" onclick="sendMessage()">မေးမည်</button>
         </div>
     </div>
@@ -213,12 +213,12 @@
     <script>
         const GROQ_API_KEY = "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";
         
-        let activeMessages = [
-            { 
-                role: "system", 
-                content: "You are RLay AI, an expert software developer and Web Coding specialist. You help users build websites and mobile apps. Write clean code in Markdown code blocks and respond in fluent Myanmar language." 
-            }
-        ];
+        const systemPrompt = { 
+            role: "system", 
+            content: "You are RLay AI, an expert software developer and Web Coding specialist. You help users build websites and mobile apps. Write clean code in Markdown code blocks and respond in fluent Myanmar language." 
+        };
+
+        let activeMessages = [systemPrompt];
 
         function toggleSidebar() {
             document.getElementById("sidebar").classList.toggle("active");
@@ -226,10 +226,22 @@
         }
 
         function startNewChat() {
-            activeMessages = [activeMessages[0]]; 
+            activeMessages = [systemPrompt]; 
             const chatBox = document.getElementById("chat-box");
             chatBox.innerHTML = `<div class="message bot">မင်္ဂလာပါ! စာမျက်နှာအသစ် စတင်လိုက်ပါပြီ။ ဘာတွေ ကူညီပေးရမလဲခင်ဗျာ။</div>`;
             toggleSidebar();
+        }
+
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+        }
+
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
         }
 
         window.renderHistoricalChat = function(userMsg, aiReply) {
@@ -247,9 +259,20 @@
 
             const chatBox = document.getElementById("chat-box");
             chatBox.innerHTML += `<div class="message user">${escapeHtml(text)}</div>`;
+            
+            // Input Reset
             input.value = "";
+            input.style.height = "24px";
 
             activeMessages.push({ role: "user", content: text });
+
+            // Context အလွန်အမင်း မရှည်သွားစေရန် စီမံခြင်း (နောက်ဆုံး 10 စာကြောင်းပဲ API သို့ ပို့မည်)
+            let trimmedMessages = [systemPrompt];
+            if (activeMessages.length > 10) {
+                trimmedMessages = [systemPrompt, ...activeMessages.slice(-10)];
+            } else {
+                trimmedMessages = activeMessages;
+            }
 
             const loadingId = "loading-" + Date.now();
             chatBox.innerHTML += `<div class="message bot" id="${loadingId}">စဉ်းစားနေသည်...</div>`;
@@ -258,16 +281,22 @@
             try {
                 const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
                     method: "POST",
-                    headers: { "Authorization": `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
+                    headers: { 
+                        "Authorization": `Bearer ${GROQ_API_KEY}`, 
+                        "Content-Type": "application/json" 
+                    },
                     body: JSON.stringify({
                         model: "llama-3.3-70b-versatile",
-                        messages: activeMessages,
-                        temperature: 0.5
+                        messages: trimmedMessages,
+                        temperature: 0.5,
+                        max_tokens: 4096 // 🔥 စာအရှည်ကြီး အဖြေပြန်ပေးနိုင်ရန် ထည့်သွင်းထားသည်
                     })
                 });
 
                 const data = await res.json();
-                document.getElementById(loadingId).remove();
+                
+                const loader = document.getElementById(loadingId);
+                if(loader) loader.remove();
 
                 if (data.choices && data.choices[0]) {
                     const aiReply = data.choices[0].message.content;
@@ -275,15 +304,20 @@
                     
                     chatBox.innerHTML += `<div class="message bot">${marked.parse(aiReply)}</div>`;
 
-                    // Local Storage + Firestore ထဲသို့ သိမ်းဆည်းခြင်း
                     if (window.saveChatHistory) {
                         window.saveChatHistory(text, aiReply);
                     }
+                } else if (data.error) {
+                    console.error("Groq API Error:", data.error);
+                    chatBox.innerHTML += `<div class="message bot" style="color:red;">API Error: ${data.error.message}</div>`;
                 }
+                
                 chatBox.scrollTop = chatBox.scrollHeight;
             } catch (err) {
-                document.getElementById(loadingId).remove();
-                chatBox.innerHTML += `<div class="message bot" style="color:red;">Error ဖြစ်ပေါ်နေပါသည်။ ပြန်လည်ကြိုးစားပေးပါ။</div>`;
+                console.error("Fetch Error:", err);
+                const loader = document.getElementById(loadingId);
+                if(loader) loader.remove();
+                chatBox.innerHTML += `<div class="message bot" style="color:red;">ကွန်ရက် ချိတ်ဆက်မှု Error ဖြစ်ပေါ်နေပါသည်။ ပြန်လည်ကြိုးစားပေးပါ။</div>`;
             }
         }
 
@@ -293,4 +327,4 @@
     </script>
 </body>
     </html>
-            
+    
