@@ -4,14 +4,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>RLay AI Assistant</title>
-    <!-- Code Blocks များ ပြသရန် Marked.js -->
+    <!-- Marked.js for Code Formatting -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     
     <!-- Firebase SDK Modules -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, signInWithPopup, signInWithRedirect, GoogleAuthProvider, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, where, getDocs, deleteDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { 
+            getAuth, 
+            signInWithPopup, 
+            signInWithRedirect, 
+            getRedirectResult, 
+            GoogleAuthProvider, 
+            signOut, 
+            onAuthStateChanged, 
+            setPersistence, 
+            browserLocalPersistence 
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            query, 
+            where, 
+            getDocs, 
+            deleteDoc, 
+            doc, 
+            serverTimestamp 
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         // Firebase Config
         const firebaseConfig = {
@@ -30,21 +50,38 @@
         const db = getFirestore(app);
         let currentUser = null;
 
-        // Ensure Login Persistence is set to LOCAL
+        // Set Login Persistence
         setPersistence(auth, browserLocalPersistence).catch(console.error);
 
-        // Improved Login Logic for Mobile
+        // Mobile Redirect Result Handling Fix
+        getRedirectResult(auth).then((result) => {
+            if (result && result.user) {
+                console.log("Redirect Login Successful:", result.user);
+            }
+        }).catch((error) => {
+            console.error("Redirect Error:", error);
+        });
+
+        // Improved Login Function
         window.loginWithGoogle = async function() {
             const provider = new GoogleAuthProvider();
+            // Optional: Ask account picker every time
+            provider.setCustomParameters({ prompt: 'select_account' });
+
             try {
+                // Try Popup First
                 await signInWithPopup(auth, provider);
             } catch (error) {
-                console.warn("Popup blocked or failed, trying redirect...", error);
-                try {
-                    await signInWithRedirect(auth, provider);
-                } catch (redErr) {
-                    console.error("Login Error:", redErr);
-                    alert("Login Error: " + redErr.message);
+                console.warn("Popup blocked or failed, falling back to Redirect...", error);
+                if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
+                    try {
+                        await signInWithRedirect(auth, provider);
+                    } catch (redErr) {
+                        console.error("Redirect Login Error:", redErr);
+                        alert("Login Error: " + redErr.message);
+                    }
+                } else {
+                    alert("Login Error: " + error.message);
                 }
             }
         };
@@ -78,7 +115,7 @@
             }
         });
 
-        // Save Chat History exclusively in Firestore & LocalStorage
+        // Save History Function
         window.saveChatHistory = async function(userText, aiReplyText) {
             const chatItem = { userMessage: userText, aiResponse: aiReplyText, timestamp: Date.now() };
 
@@ -101,7 +138,7 @@
             renderHistoryList(localData);
         };
 
-        // Clear All History Function
+        // Clear History Function
         window.clearAllHistory = async function() {
             if (!confirm("မှတ်တမ်း အားလုံးကို ဖျက်ရန် သေချာပါသလား?")) return;
 
@@ -283,6 +320,7 @@
     </div>
 
     <script>
+        // Note: Replace with active keys if revoked by Groq provider
         const GROQ_API_KEYS = [
             "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",
             "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"
@@ -406,7 +444,7 @@
 
                 let errorDisplay = "ကွန်ရက် ချိတ်ဆက်မှု အခက်အခဲ ရှိနေပါသည်။ ခဏစောင့်ပြီး ထပ်မံ ကြိုးစားပေးပါ။";
                 if (err.message === "RATE_LIMIT_EXCEEDED") {
-                    errorDisplay = "⚠️ <b>Daily Token Limit</b> ပြည့်သွားပါပြီ။ ၁ မိနစ်ခန့် စောင့်ဆိုင်းပေးပါခင်ဗျာ။";
+                    errorDisplay = "⚠️ API Key ဖြင့် ချိတ်ဆက်၍ မရပါ။ (API Key များ သက်တမ်းကုန်/Revoke ဖြစ်သွားခြင်း ဖြစ်နိုင်ပါသည်။)";
                 }
                 chatBox.innerHTML += `<div class="message bot" style="color:#ff8080;">${errorDisplay}</div>`;
             }
@@ -417,5 +455,4 @@
         }
     </script>
 </body>
-    </html>
-    
+</html>
