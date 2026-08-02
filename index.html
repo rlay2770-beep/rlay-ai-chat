@@ -236,7 +236,22 @@
     </div>
 
     <script>
-        const GROQ_API_KEY = "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";
+        // API Keys စာရင်း (Key တစ်ခု Limit ပြည့်ပါက အလိုအလျောက် ဒုတိယတစ်ခုသို့ ပြောင်းသုံးပါမည်)
+        const GROQ_API_KEYS = [
+            "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", // Key 1
+            "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"  // Key 2
+        ];
+
+        let currentKeyIndex = 0;
+
+        function getApiKey() {
+            return GROQ_API_KEYS[currentKeyIndex];
+        }
+
+        function rotateApiKey() {
+            currentKeyIndex = (currentKeyIndex + 1) % GROQ_API_KEYS.length;
+            console.log("Switching to next Groq API Key Index:", currentKeyIndex);
+        }
 
         function toggleSidebar() {
             document.getElementById("sidebar").classList.toggle("active");
@@ -269,6 +284,41 @@
             `;
         };
 
+        // Groq API Request with Auto Key Rotation Logic
+        async function fetchGroqAI(text, retryCount = 0) {
+            if (retryCount >= GROQ_API_KEYS.length) {
+                throw new Error("RATE_LIMIT_EXCEEDED");
+            }
+
+            const apiKey = getApiKey();
+            const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                method: "POST",
+                headers: { 
+                    "Authorization": `Bearer ${apiKey}`, 
+                    "Content-Type": "application/json" 
+                },
+                body: JSON.stringify({
+                    model: "llama-3.3-70b-versatile",
+                    messages: [
+                        { role: "system", content: "You are RLay Developer AI, a helpful coding assistant. Answer concisely in Myanmar language." },
+                        { role: "user", content: text }
+                    ],
+                    temperature: 0.6,
+                    max_tokens: 512
+                })
+            });
+
+            const data = await res.json();
+
+            // Rate limit သို့မဟုတ် Tokens Limit တက်ပါက Key ပြောင်းပြီး ထပ်မံ ကြိုးစားမည်
+            if (data.error && (data.error.message.includes("Rate limit") || data.error.message.includes("TPD"))) {
+                rotateApiKey();
+                return await fetchGroqAI(text, retryCount + 1);
+            }
+
+            return data;
+        }
+
         async function sendMessage() {
             const input = document.getElementById("userInput");
             const text = input.value.trim();
@@ -285,28 +335,10 @@
             chatBox.scrollTop = chatBox.scrollHeight;
 
             try {
-                // ⚡ Groq သို့ Token မကုန်အောင် လက်ရှိ မေးခွန်း သီးသန့် အနည်းငယ်သာ ပို့မည်
-                const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-                    method: "POST",
-                    headers: { 
-                        "Authorization": `Bearer ${GROQ_API_KEY}`, 
-                        "Content-Type": "application/json" 
-                    },
-                    body: JSON.stringify({
-                        model: "llama-3.3-70b-versatile",
-                        messages: [
-                            { role: "system", content: "You are a helpful assistant. Answer concisely in Myanmar language." },
-                            { role: "user", content: text }
-                        ],
-                        temperature: 0.5,
-                        max_tokens: 512
-                    })
-                });
-
-                const data = await res.json();
+                const data = await fetchGroqAI(text);
                 
                 const loader = document.getElementById(loadingId);
-                if(loader) loader.remove();
+                if (loader) loader.remove();
 
                 if (data.choices && data.choices[0]) {
                     const aiReply = data.choices[0].message.content;
@@ -319,19 +351,20 @@
                     }
                 } else if (data.error) {
                     console.error("Groq API Error:", data.error);
-                    let errorMsg = data.error.message;
-                    if (errorMsg.includes("Rate limit reached") || errorMsg.includes("TPD")) {
-                        errorMsg = "⚠️ <b>Daily Token Limit</b> ပြည့်သွားပါပြီ။ 4 မိနစ်ခန့် စောင့်ဆိုင်းပြီးမှ ပြန်လည် စမ်းသပ်ပေးပါ။";
-                    }
-                    chatBox.innerHTML += `<div class="message bot" style="color:#ff8080;">${errorMsg}</div>`;
+                    chatBox.innerHTML += `<div class="message bot" style="color:#ff8080;">${data.error.message}</div>`;
                 }
                 
                 chatBox.scrollTop = chatBox.scrollHeight;
             } catch (err) {
                 console.error("Fetch Error:", err);
                 const loader = document.getElementById(loadingId);
-                if(loader) loader.remove();
-                chatBox.innerHTML += `<div class="message bot" style="color:#ff8080;">ကွန်ရက် ချိတ်ဆက်မှု Error ဖြစ်ပေါ်နေပါသည်။ ပြန်လည်ကြိုးစားပေးပါ။</div>`;
+                if (loader) loader.remove();
+
+                let errorDisplay = "ကွန်ရက် ချိတ်ဆက်မှု Error ဖြစ်ပေါ်နေပါသည်။ ပြန်လည်ကြိုးစားပေးပါ။";
+                if (err.message === "RATE_LIMIT_EXCEEDED") {
+                    errorDisplay = "⚠️ <b>Daily Token Limit</b> ပြည့်သွားပါပြီ။ ၄ မိနစ်ခန့် စောင့်ဆိုင်းပေးပါခင်ဗျာ။";
+                }
+                chatBox.innerHTML += `<div class="message bot" style="color:#ff8080;">${errorDisplay}</div>`;
             }
         }
 
@@ -340,5 +373,5 @@
         }
     </script>
 </body>
-    </html>
-    
+        </html>
+        
