@@ -61,7 +61,7 @@
             }
         });
 
-        // Save Chat History
+        // Save Chat History exclusively in Firestore & LocalStorage
         window.saveChatHistory = async function(userText, aiReplyText) {
             const chatItem = { userMessage: userText, aiResponse: aiReplyText, timestamp: Date.now() };
 
@@ -237,13 +237,6 @@
 
     <script>
         const GROQ_API_KEY = "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";
-        
-        const systemPrompt = { 
-            role: "system", 
-            content: "You are RLay AI, a helpful coding assistant. Respond concisely and effectively in Myanmar language." 
-        };
-
-        let activeMessages = [systemPrompt];
 
         function toggleSidebar() {
             document.getElementById("sidebar").classList.toggle("active");
@@ -251,7 +244,6 @@
         }
 
         function startNewChat() {
-            activeMessages = [systemPrompt]; 
             const chatBox = document.getElementById("chat-box");
             chatBox.innerHTML = `<div class="message bot">မင်္ဂလာပါ! စာမျက်နှာအသစ် စတင်လိုက်ပါပြီ။ ဘာတွေ ကူညီပေးရမလဲခင်ဗျာ။</div>`;
             toggleSidebar();
@@ -288,21 +280,12 @@
             input.value = "";
             input.style.height = "24px";
 
-            activeMessages.push({ role: "user", content: text });
-
-            // ⚡ Token အလွန်အမင်း မကုန်စေရန် နောက်ဆုံး စာကြောင်း (၄) ကြောင်းသာ ပို့မည် (Smart Context)
-            let trimmedMessages = [systemPrompt];
-            if (activeMessages.length > 4) {
-                trimmedMessages = [systemPrompt, ...activeMessages.slice(-4)];
-            } else {
-                trimmedMessages = activeMessages;
-            }
-
             const loadingId = "loading-" + Date.now();
             chatBox.innerHTML += `<div class="message bot" id="${loadingId}">စဉ်းစားနေသည်...</div>`;
             chatBox.scrollTop = chatBox.scrollHeight;
 
             try {
+                // ⚡ Groq သို့ Token မကုန်အောင် လက်ရှိ မေးခွန်း သီးသန့် အနည်းငယ်သာ ပို့မည်
                 const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
                     method: "POST",
                     headers: { 
@@ -311,9 +294,12 @@
                     },
                     body: JSON.stringify({
                         model: "llama-3.3-70b-versatile",
-                        messages: trimmedMessages,
+                        messages: [
+                            { role: "system", content: "You are a helpful assistant. Answer concisely in Myanmar language." },
+                            { role: "user", content: text }
+                        ],
                         temperature: 0.5,
-                        max_tokens: 512 // ⚡ Token ကုန်သက်သာစေရန် 512 သို့ အကောင်းဆုံး ချုံ့ပေးထားသည်
+                        max_tokens: 512
                     })
                 });
 
@@ -324,22 +310,19 @@
 
                 if (data.choices && data.choices[0]) {
                     const aiReply = data.choices[0].message.content;
-                    activeMessages.push({ role: "assistant", content: aiReply });
                     
                     chatBox.innerHTML += `<div class="message bot">${marked.parse(aiReply)}</div>`;
 
+                    // စကားပြော မှတ်တမ်းများကို Firestore ထဲသို့သာ သီးသန့် သိမ်းဆည်းမည်
                     if (window.saveChatHistory) {
                         window.saveChatHistory(text, aiReply);
                     }
                 } else if (data.error) {
                     console.error("Groq API Error:", data.error);
                     let errorMsg = data.error.message;
-                    
-                    // အကယ်၍ Rate Limit (Daily Limit) ပြည့်သွားပါက သုံးစွဲသူ နားလည်လွယ်အောင် ပြသပေးရန်
                     if (errorMsg.includes("Rate limit reached") || errorMsg.includes("TPD")) {
-                        errorMsg = "⚠️ <b>Daily Token Limit (တစ်နေ့တာ အသုံးပြုခွင့်)</b> ပြည့်သွားပါပြီ။ 24 နာရီပြည့်မှ သို့မဟုတ် API Key အသစ် လဲလှယ်သုံးစွဲမှသာ အလုပ်လုပ်ပါမည်။";
+                        errorMsg = "⚠️ <b>Daily Token Limit</b> ပြည့်သွားပါပြီ။ 4 မိနစ်ခန့် စောင့်ဆိုင်းပြီးမှ ပြန်လည် စမ်းသပ်ပေးပါ။";
                     }
-                    
                     chatBox.innerHTML += `<div class="message bot" style="color:#ff8080;">${errorMsg}</div>`;
                 }
                 
@@ -358,4 +341,4 @@
     </script>
 </body>
     </html>
-        
+    
