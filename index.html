@@ -4,73 +4,62 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>RLay AI Assistant</title>
-    <!-- Marked.js for Code Rendering -->
+    <!-- Code Blocks များ သေချာ ပြသရန် Marked.js ထည့်သွင်းခြင်း -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <!-- Firebase SDK Modules ထည့်သွင်းခြင်း (Firestore API သုံးနိုင်ရန်) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // 🔥 သင့်ရဲ့ Firebase/Firestore Config Details များကို ဒီမှာ ထည့်သွင်းပါ
+        const firebaseConfig = {
+            apiKey: "YOUR_FIREBASE_API_KEY_HERE",
+            authDomain: "rlays-ai-dictionary.firebaseapp.com",
+            projectId: "rlays-ai-dictionary",
+            storageBucket: "rlays-ai-dictionary.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Firebase / Firestore Initialize လုပ်ခြင်း
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Global scope သို့ Firestore Function များကို ပို့ပေးခြင်း
+        window.saveChatToFirestore = async function(userText, aiReplyText) {
+            try {
+                await addDoc(collection(db, "chat_history"), {
+                    userMessage: userText,
+                    aiResponse: aiReplyText,
+                    timestamp: serverTimestamp()
+                });
+                console.log("Chat successfully saved to Firestore!");
+            } catch (e) {
+                console.error("Error adding document to Firestore: ", e);
+            }
+        };
+    </script>
 
     <style>
         * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-        body { margin: 0; background-color: #131314; color: #e3e3e3; height: 100vh; height: 100dvh; overflow: hidden; }
+        body { margin: 0; background-color: #131314; color: #e3e3e3; height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
 
-        /* General Page View Setup */
-        .page { display: none; width: 100%; height: 100%; flex-direction: column; }
-        .page.active { display: flex; }
+        /* Header UI */
+        .header { padding: 14px 20px; background: #1e1f20; border-bottom: 1px solid #2e2f31; display: flex; justify-content: space-between; align-items: center; }
+        .header h3 { margin: 0; color: #a8c7fa; font-size: 16px; font-weight: 600; }
 
-        /* ---------------- PAGE 1: AUTH PAGE ---------------- */
-        #auth-page { justify-content: center; align-items: center; padding: 20px; }
-        .login-card {
-            background: #1e1f20; padding: 30px 25px; border-radius: 20px;
-            border: 1px solid #333; text-align: center; max-width: 380px; width: 100%;
-        }
-        .login-card h2 { color: #a8c7fa; margin-bottom: 24px; font-size: 22px; }
-        .login-card input {
-            width: 100%; padding: 14px; margin-bottom: 12px; border-radius: 10px;
-            border: 1px solid #444; background: #2a2a2a; color: white; outline: none; font-size: 15px;
-        }
-        .auth-btn {
-            width: 100%; padding: 14px; background: #a8c7fa; color: #040c1e;
-            border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 15px; margin-top: 5px;
-        }
-
-        /* ---------------- PAGE 2: DASHBOARD / HISTORY PAGE ---------------- */
-        .dash-header {
-            padding: 18px 20px; background: #1e1f20; border-bottom: 1px solid #2e2f31;
-            display: flex; justify-content: space-between; align-items: center;
-        }
-        .dash-header .user-info { font-size: 13px; color: #a8c7fa; font-weight: 500; }
-        .logout-btn { color: #ff6b6b; background: rgba(255,107,107,0.1); border: 1px solid #ff6b6b; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; }
-        
-        .dash-content { flex: 1; padding: 20px; overflow-y: auto; max-width: 600px; margin: 0 auto; width: 100%; }
-        .new-chat-card {
-            background: #a8c7fa; color: #040c1e; padding: 16px; border-radius: 14px;
-            font-weight: bold; text-align: center; cursor: pointer; font-size: 16px; margin-bottom: 25px;
-            box-shadow: 0 4px 12px rgba(168, 199, 250, 0.2);
-        }
-        .section-title { font-size: 14px; color: #8e918f; margin-bottom: 12px; font-weight: 600; }
-        .history-list { display: flex; flex-direction: column; gap: 10px; }
-        .history-item {
-            padding: 14px 16px; border-radius: 12px; background: #1e1f20; border: 1px solid #2e2f31;
-            cursor: pointer; font-size: 14px; display: flex; justify-content: space-between; align-items: center;
-        }
-        .history-item:active { background: #2a2a2a; }
-
-        /* ---------------- PAGE 3: CHAT PAGE ---------------- */
-        .chat-header {
-            padding: 12px 16px; background: #1e1f20; border-bottom: 1px solid #2e2f31;
-            display: flex; align-items: center; gap: 15px;
-        }
-        .back-btn { background: #2a2a2a; color: #a8c7fa; border: 1px solid #333; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 14px; }
-        .chat-title { font-size: 15px; color: #e3e3e3; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
+        /* Chat Area */
         #chat-box { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
-        .message { max-width: 88%; padding: 12px 16px; border-radius: 16px; font-size: 15px; line-height: 1.5; word-wrap: break-word; }
+        .message { max-width: 90%; padding: 12px 16px; border-radius: 16px; font-size: 15px; line-height: 1.6; word-wrap: break-word; }
         .user { background: #282a2c; color: #e3e3e3; align-self: flex-end; border-bottom-right-radius: 4px; }
         .bot { background: #1e1f20; color: #c4c7c5; align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid #2e2f31; }
 
-        /* Code Block Styling */
+        /* Code Block Styling (Gemini Style) */
         pre { background: #0d0e0f; padding: 12px; border-radius: 8px; overflow-x: auto; border: 1px solid #333; margin: 8px 0; }
-        code { font-family: monospace; color: #75beff; }
+        code { font-family: monospace; color: #75beff; font-size: 14px; }
 
-        /* Chat Input Section */
+        /* Input Area */
         .input-area-wrapper { padding: 12px 16px; background: #131314; border-top: 1px solid #2e2f31; }
         .input-area { max-width: 800px; margin: 0 auto; display: flex; background: #1e1f20; border-radius: 28px; padding: 4px 8px 4px 16px; border: 1px solid #333; }
         input[type="text"] { flex: 1; background: transparent; border: none; color: #fff; font-size: 15px; outline: none; }
@@ -79,170 +68,39 @@
 </head>
 <body>
 
-    <!-- 1. LOGIN / REGISTER PAGE -->
-    <div id="auth-page" class="page active">
-        <div class="login-card">
-            <h2>✨ RLay AI Login</h2>
-            <input type="email" id="authEmail" placeholder="အီးမေးလ် (Email)">
-            <input type="password" id="authPassword" placeholder="လျှို့ဝှက်နံပါတ် (Password)">
-            <button class="auth-btn" onclick="handleLogin()">အကောင့်ဝင်မည်</button>
-            <button class="auth-btn" style="background: #2a2a2a; color: #a8c7fa;" onclick="handleRegister()">အကောင့်သစ်ဖွင့်မည်</button>
+    <div class="header">
+        <h3>✨ RLay Developer AI</h3>
+    </div>
+
+    <div id="chat-box">
+        <div class="message bot">မင်္ဂလာပါ! ကျွန်တော်က RLay Developer AI ဖြစ်ပါတယ်။ HTML/CSS/JS Coding နဲ့ Web-to-App ဖန်တီးမှုတွေမှာ ဘာတွေ ကူညီပေးရမလဲခင်ဗျာ။</div>
+    </div>
+
+    <div class="input-area-wrapper">
+        <div class="input-area">
+            <input type="text" id="userInput" placeholder="Coding သို့မဟုတ် တစ်ခုခု မေးမြန်းပါ..." onkeypress="if(event.key==='Enter') sendMessage()">
+            <button class="send-btn" onclick="sendMessage()">မေးမည်</button>
         </div>
     </div>
 
-    <!-- 2. DASHBOARD / HISTORY PAGE -->
-    <div id="dash-page" class="page">
-        <div class="dash-header">
-            <div class="user-info" id="userDisplay">user@gmail.com</div>
-            <button class="logout-btn" onclick="handleLogout()">ထွက်မည်</button>
-        </div>
-        <div class="dash-content">
-            <div class="new-chat-card" onclick="createNewChat()">+ စကားဝိုင်းအသစ် စတင်မည်</div>
-            <div class="section-title">ယခင် စကားဝိုင်းများ</div>
-            <div class="history-list" id="historyList"></div>
-        </div>
-    </div>
-
-    <!-- 3. CHAT PAGE -->
-    <div id="chat-page" class="page">
-        <div class="chat-header">
-            <button class="back-btn" onclick="showPage('dash-page')">← နောက်သို့</button>
-            <div class="chat-title" id="activeChatTitle">စကားဝိုင်း</div>
-        </div>
-
-        <div id="chat-box"></div>
-
-        <div class="input-area-wrapper">
-            <div class="input-area">
-                <input type="text" id="userInput" placeholder="တစ်ခုခု မေးမြန်းပါ..." onkeypress="if(event.key==='Enter') sendMessage()">
-                <button class="send-btn" onclick="sendMessage()">မေးမည်</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Firebase SDK Imports -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { 
-            getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, 
-            onAuthStateChanged, signOut 
-        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { 
-            getFirestore, collection, addDoc, doc, setDoc, query, where, onSnapshot 
-        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-        // Firebase Configuration Credentials
-        const firebaseConfig = {
-            apiKey: "AIzaSyDOkVig413DDIo1ouusq2qhTIeb3jUMU24",
-            authDomain: "rlay-ai-chat.firebaseapp.com",
-            databaseURL: "https://rlay-ai-chat-default-rtdb.firebaseio.com",
-            projectId: "rlay-ai-chat",
-            storageBucket: "rlay-ai-chat.firebasestorage.app",
-            messagingSenderId: "615991559092",
-            appId: "1:615991559092:web:43ea7ee7b1439ab3dbe8e1",
-            measurementId: "G-PM0242NLLE"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
+    <script>
         const API_KEY = "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";
-        const systemPrompt = "You are an advanced AI assistant built like Google Gemini. Always respond in fluent, grammatically correct, and polite Myanmar language. Write code inside Markdown code blocks.";
-
-        let currentUser = null;
-        let currentSessionId = null;
-        let activeMessages = [];
-
-        // Page Switcher Function
-        window.showPage = (pageId) => {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.getElementById(pageId).classList.add('active');
-        };
-
-        // Firebase Auth Monitor
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                currentUser = user;
-                document.getElementById("userDisplay").innerText = user.email;
-                showPage("dash-page");
-                loadUserHistory();
-            } else {
-                currentUser = null;
-                showPage("auth-page");
+        
+        // Gemini ကဲ့သို့ Coding Expert အဖြစ် ပြုမူစေမည့် System Prompt
+        const activeMessages = [
+            { 
+                role: "system", 
+                content: "You are RLay AI, an expert software developer and Web Coding specialist. You help users build websites and mobile apps, especially for users coding on mobile devices. When asked for code (like HTML, CSS, JavaScript), write clean, complete, and functional code inside Markdown code blocks. Always respond in fluent, accurate, and natural Myanmar language." 
             }
-        });
+        ];
 
-        // Authentication Actions
-        window.handleRegister = async () => {
-            const email = document.getElementById("authEmail").value;
-            const pass = document.getElementById("authPassword").value;
-            try {
-                await createUserWithEmailAndPassword(auth, email, pass);
-            } catch (e) { alert("အကောင့်ဖွင့်ခြင်း မအောင်မြင်ပါ: " + e.message); }
-        };
-
-        window.handleLogin = async () => {
-            const email = document.getElementById("authEmail").value;
-            const pass = document.getElementById("authPassword").value;
-            try {
-                await signInWithEmailAndPassword(auth, email, pass);
-            } catch (e) { alert("အကောင့်ဝင်ခြင်း မအောင်မြင်ပါ: " + e.message); }
-        };
-
-        window.handleLogout = () => signOut(auth);
-
-        // Load History List
-        function loadUserHistory() {
-            const q = query(collection(db, "chats"), where("userId", "==", currentUser.uid));
-            onSnapshot(q, (snapshot) => {
-                const listEl = document.getElementById("historyList");
-                listEl.innerHTML = "";
-                snapshot.forEach((docSnap) => {
-                    const data = docSnap.data();
-                    const item = document.createElement("div");
-                    item.className = "history-item";
-                    item.innerText = data.title || "စကားဝိုင်း";
-                    item.onclick = () => selectSession(docSnap.id, data.title, data.messages);
-                    listEl.appendChild(item);
-                });
-            });
-        }
-
-        // Create New Chat
-        window.createNewChat = () => {
-            currentSessionId = null;
-            activeMessages = [{ role: "system", content: systemPrompt }];
-            document.getElementById("chat-box").innerHTML = "";
-            document.getElementById("activeChatTitle").innerText = "စကားဝိုင်းအသစ်";
-            showPage("chat-page");
-        };
-
-        // Select Existing Chat
-        function selectSession(id, title, messages) {
-            currentSessionId = id;
-            activeMessages = messages;
-            document.getElementById("activeChatTitle").innerText = title || "စကားဝိုင်း";
-            
-            const chatBox = document.getElementById("chat-box");
-            chatBox.innerHTML = "";
-            messages.forEach(msg => {
-                if (msg.role === "user") chatBox.innerHTML += `<div class="message user">${msg.content}</div>`;
-                if (msg.role === "assistant") chatBox.innerHTML += `<div class="message bot">${marked.parse(msg.content)}</div>`;
-            });
-            
-            showPage("chat-page");
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        // Send Message
-        window.sendMessage = async () => {
+        async function sendMessage() {
             const input = document.getElementById("userInput");
             const text = input.value.trim();
-            if (!text || !currentUser) return;
+            if (!text) return;
 
             const chatBox = document.getElementById("chat-box");
-            chatBox.innerHTML += `<div class="message user">${text}</div>`;
+            chatBox.innerHTML += `<div class="message user">${escapeHtml(text)}</div>`;
             input.value = "";
 
             activeMessages.push({ role: "user", content: text });
@@ -258,7 +116,7 @@
                     body: JSON.stringify({
                         model: "llama-3.3-70b-versatile",
                         messages: activeMessages,
-                        temperature: 0.6
+                        temperature: 0.5
                     })
                 });
 
@@ -268,24 +126,13 @@
                 if (data.choices && data.choices[0]) {
                     const aiReply = data.choices[0].message.content;
                     activeMessages.push({ role: "assistant", content: aiReply });
+                    
+                    // Marked.js ဖြင့် Code Block များကို သန့်ရှင်းစွာ Render လုပ်ခြင်း
                     chatBox.innerHTML += `<div class="message bot">${marked.parse(aiReply)}</div>`;
 
-                    // Firestore တွင် သိမ်းဆည်းခြင်း
-                    if (!currentSessionId) {
-                        const titleText = text.length > 25 ? text.substring(0, 25) + "..." : text;
-                        document.getElementById("activeChatTitle").innerText = titleText;
-                        const newDoc = await addDoc(collection(db, "chats"), {
-                            userId: currentUser.uid,
-                            title: titleText,
-                            messages: activeMessages,
-                            createdAt: new Date()
-                        });
-                        currentSessionId = newDoc.id;
-                    } else {
-                        await setDoc(doc(db, "chats", currentSessionId), {
-                            userId: currentUser.uid,
-                            messages: activeMessages
-                        }, { merge: true });
+                    // 🔥 Firestore ထဲသို့ User မေးခွန်းနှင့် AI ပြန်ဖြေချက်ကို Auto Cloud Sync/Save လုပ်ခြင်း
+                    if (window.saveChatToFirestore) {
+                        window.saveChatToFirestore(text, aiReply);
                     }
                 }
                 chatBox.scrollTop = chatBox.scrollHeight;
@@ -293,8 +140,11 @@
                 document.getElementById(loadingId).remove();
                 chatBox.innerHTML += `<div class="message bot" style="color:red;">Error ဖြစ်ပေါ်နေပါသည်။ ပြန်လည်ကြိုးစားပေးပါ။</div>`;
             }
-        };
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
     </script>
 </body>
-                </html>
-                                                          
+</html>
